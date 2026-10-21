@@ -4,7 +4,7 @@
 Aucune dépendance : Python 3.8+ suffit.
     python3 serveur.py            -> http://127.0.0.1:7777
 
-Réglages : fichier config.json à côté de ce script (voir config.exemple.json),
+Réglages : fichier config.json (à côté de ce script, ou dans %APPDATA%\\Parloir pour Parloir.exe),
 ou variables d'environnement PARLOIR_PORT, PARLOIR_MACHINE, PARLOIR_MEMOIRE, PARLOIR_MAX_IA.
 
 Mémoire : chaque conversation est enregistrée dans <memoire>/<machine>/<id>.jsonl.
@@ -23,25 +23,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-ICI = Path(__file__).resolve().parent
+import chemins
+import systeme
 
-
-def lire_config():
-    cfg = {}
-    f = ICI / "config.json"
-    if f.exists():
-        try:
-            cfg = json.loads(f.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            raise SystemExit(f"config.json invalide : {e}")
-    return cfg
-
-
-CFG = lire_config()
-PORT = int(os.environ.get("PARLOIR_PORT") or CFG.get("port") or 7777)
+CFG = chemins.lire_config()
+PORT = chemins.port()
 HOTE = os.environ.get("PARLOIR_HOTE") or CFG.get("hote") or "127.0.0.1"
 MACHINE = re.sub(r"[^\w.-]+", "-", os.environ.get("PARLOIR_MACHINE") or CFG.get("machine") or socket.gethostname()).strip("-") or "PC"
-MEMOIRE = Path(os.path.expanduser(os.environ.get("PARLOIR_MEMOIRE") or CFG.get("memoire") or str(ICI / "memoire")))
+MEMOIRE = Path(os.path.expanduser(os.environ.get("PARLOIR_MEMOIRE") or CFG.get("memoire") or str(chemins.DONNEES / "memoire")))
 # Nombre max de messages d'IA d'affilée sans intervention humaine (anti ping-pong).
 MAX_IA_DAFFILEE = int(os.environ.get("PARLOIR_MAX_IA") or CFG.get("max_ia") or 6)
 HUMAIN = "Toi"
@@ -211,6 +200,24 @@ def nouvelle_conversation(reprise=None):
         ajouter("Parloir", "Nouvelle conversation.", systeme=True, nouvelle=True)
 
 
+def changer_memoire(nouvelle, machine=None):
+    """Bascule la mémoire vers un autre dossier (ex. Google Drive), sans perdre l'historique de ce PC."""
+    global MEMOIRE, MACHINE
+    import shutil
+    with verrou:
+        ancienne = MEMOIRE / MACHINE
+        MEMOIRE = Path(nouvelle)
+        if machine:
+            MACHINE = machine
+        cible = MEMOIRE / MACHINE
+        cible.mkdir(parents=True, exist_ok=True)
+        if ancienne.is_dir() and ancienne.resolve() != cible.resolve():
+            for f in ancienne.glob("*.jsonl"):
+                if not (cible / f.name).exists():
+                    shutil.copy2(f, cible / f.name)
+        ouvrir(etat["conv"])
+
+
 def ia_daffilee():
     n = 0
     for m in reversed(messages):
@@ -234,9 +241,26 @@ def infos():
 
 # ---------- HTTP ----------
 
+PAGES = {"/": "index.html", "/index.html": "index.html", "/accueil": "accueil.html"}
+HOTES_OK = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+
+
 class Gestionnaire(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def _hote_ok(self):
+        # Contre le « DNS rebinding » : on ne répond qu'aux adresses locales.
+        return self.headers.get("Host", "") in HOTES_OK
+
+    def _page(self, nom):
+        corps = (chemins.RESSOURCES / nom).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(corps)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(corps)
 
     def _json(self, code, obj):
         corps = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -257,15 +281,14 @@ class Gestionnaire(BaseHTTPRequestHandler):
             return {}
 
     def do_GET(self):
+        if not self._hote_ok():
+            return self._json(403, {"erreur": "accès refusé"})
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
-        if url.path in ("/", "/index.html"):
-            corps = (ICI / "index.html").read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(corps)))
-            self.end_headers()
-            self.wfile.write(corps)
+        if url.path in PAGES:
+            self._page(PAGES[url.path])
+        elif url.path == "/api/systeme":
+            self._json(200, systeme.etat())
         elif url.path == "/api/messages":
             depuis = int(q.get("depuis", 0))
             attendre = min(float(q.get("attendre", 0)), 55.0)
@@ -306,8 +329,17 @@ class Gestionnaire(BaseHTTPRequestHandler):
             self._json(404, {"erreur": "introuvable"})
 
     def do_POST(self):
+        # Un site web ne peut pas envoyer cet en-tête au parloir sans autorisation (CORS) :
+        # ça empêche une page malveillante d'écrire ou de lancer une installation à ta place.
+        if not self._hote_ok() or self.headers.get("X-Parloir") != "1":
+            return self._json(403, {"erreur": "accès refusé"})
         url = urlparse(self.path)
         d = self._corps()
+        if url.path.startswith("/api/systeme/"):
+            try:
+                return self._json(200, systeme.action(url.path.rsplit("/", 1)[1], d))
+            except Exception as e:
+                return self._json(400, {"erreur": str(e)})
         if url.path == "/api/messages":
             auteur = str(d.get("auteur") or HUMAIN).strip()[:40]
             texte = str(d.get("texte") or "").strip()
@@ -356,6 +388,7 @@ def main():
     charger()
     serveur = ThreadingHTTPServer((HOTE, PORT), Gestionnaire)
     serveur.daemon_threads = True
+    systeme.arreter_serveur = serveur.shutdown
     print(f"Le Parloir est ouvert : http://{HOTE}:{PORT}\n"
           f"  PC : {MACHINE}\n  Mémoire : {MEMOIRE}", flush=True)
     try:

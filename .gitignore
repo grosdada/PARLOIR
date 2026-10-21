@@ -8,3 +8,10 @@ parloir.jsonl
 __pycache__/
 *.pyc
 .DS_Store
+
+# Fabrication de l'exe et journaux
+build/
+dist/
+*.spec
+version.txt
+invite-*.log

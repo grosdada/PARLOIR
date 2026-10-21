@@ -36,6 +36,8 @@
   .presence span { display: inline-flex; align-items: center; gap: 6px; }
   .point { width: 8px; height: 8px; border-radius: 50%; background: var(--bord); }
   .point.on { background: #2fb36b; box-shadow: 0 0 0 3px #2fb36b33; }
+  header .bouton-lien { border: 1px solid var(--bord); color: var(--doux); border-radius: 8px; padding: 5px 10px; font-size: 13px; text-decoration: none; }
+  header .bouton-lien:hover { color: var(--texte); }
   header button { background: none; border: 1px solid var(--bord); color: var(--doux); border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit; font-size: 13px; }
   header button:hover { color: var(--texte); }
   main { flex: 1; overflow-y: auto; padding: 20px 16px 8px; }
@@ -119,6 +121,7 @@
   <span class="etat" id="etat"></span>
   <div class="presence" id="presence"></div>
   <div class="actions">
+    <a class="bouton-lien" href="/accueil" title="Installer, inviter des IA, réglages">Réglages</a>
     <button id="ouvrirMemoire" title="Conversations passées, sur tous tes PC">Mémoire</button>
     <button id="nouvelle" title="Archiver et repartir de zéro">Nouvelle conversation</button>
   </div>
@@ -249,7 +252,7 @@ async function envoyer() {
   const texte = champ.value.trim();
   if (!texte) return;
   champ.value = ''; ajuster();
-  await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auteur: 'Toi', texte }) });
+  await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' }, body: JSON.stringify({ auteur: 'Toi', texte }) });
 }
 
 function ajuster() { champ.style.height = 'auto'; champ.style.height = Math.min(champ.scrollHeight, innerHeight * .4) + 'px'; }
@@ -261,7 +264,7 @@ function brancher(b) { b.addEventListener('click', () => { champ.value = b.datas
 document.querySelectorAll('.mentions > button').forEach(brancher);
 presence({});
 document.getElementById('nouvelle').addEventListener('click', async () => {
-  if (confirm("Démarrer une nouvelle conversation ?\nL'actuelle reste dans la mémoire.")) await fetch('/api/nouvelle', { method: 'POST' });
+  if (confirm("Démarrer une nouvelle conversation ?\nL'actuelle reste dans la mémoire.")) await fetch('/api/nouvelle', { method: 'POST', headers: { 'X-Parloir': '1' } });
 });
 
 // ---------- Mémoire ----------
@@ -336,7 +339,7 @@ document.getElementById('mRetour').addEventListener('click', liste);
 mQ.addEventListener('input', () => { clearTimeout(minuterie); minuterie = setTimeout(liste, 250); });
 document.getElementById('mReprendre').addEventListener('click', async () => {
   if (!choisie) return;
-  await fetch('/api/reprendre', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(choisie) });
+  await fetch('/api/reprendre', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' }, body: JSON.stringify(choisie) });
   fermerMemoire();
 });
 

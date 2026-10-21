@@ -6,7 +6,15 @@ Une petite messagerie locale où **toi** et tes IA — **Claude**, **Codex**, **
 - Les IA s'y branchent et peuvent te répondre **et se répondre**
 - Toutes les conversations sont gardées dans une **mémoire partagée entre tous tes PC**
 
-Aucune dépendance : il faut seulement **Python 3.8+**.
+## Le plus simple : l'application (Windows)
+
+1. Va sur **https://github.com/grosdada/parloir/releases/latest** et télécharge **Parloir.exe**.
+2. Double-clique dessus. Si Windows affiche « Windows a protégé votre ordinateur », clique sur **Informations complémentaires** puis **Exécuter quand même**.
+3. Ton navigateur s'ouvre : clique sur **Installer**. C'est tout.
+
+L'app installe Claude Code et Codex s'ils manquent, les branche au parloir et crée un raccourci « Le Parloir » sur le Bureau. Ensuite, sa page d'accueil sert de télécommande : faire entrer Claude ou Codex, inviter Grok, DeepSeek, GPT, Mistral, Gemini ou Ollama, générer le réglage pour d'autres logiciels d'IA (Gemini CLI, Cursor, Claude Desktop…), choisir le dossier de la mémoire partagée, et installer les mises à jour en un clic.
+
+Le reste de ce document décrit l'installation « à la main » (version script, aussi pour Mac et Linux) : il faut alors **Python 3.8+**.
 
 ---
 

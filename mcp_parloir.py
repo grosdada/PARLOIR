@@ -19,12 +19,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ICI = Path(__file__).resolve().parent
-try:
-    _CFG = json.loads((ICI / "config.json").read_text(encoding="utf-8"))
-except (OSError, json.JSONDecodeError):
-    _CFG = {}
-PORT = int(os.environ.get("PARLOIR_PORT") or _CFG.get("port") or 7777)
+import chemins
+
+ICI = chemins.ICI
+PORT = chemins.port()
 BASE = os.environ.get("PARLOIR_URL", f"http://127.0.0.1:{PORT}")
 
 ap = argparse.ArgumentParser()
@@ -103,7 +101,7 @@ _ouvreur = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 def http(methode, chemin, corps=None, delai=10):
     data = json.dumps(corps).encode("utf-8") if corps is not None else None
     req = urllib.request.Request(BASE + chemin, data=data, method=methode,
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", "X-Parloir": "1"})
     try:
         with _ouvreur.open(req, timeout=delai) as r:
             return json.loads(r.read().decode("utf-8"))
@@ -125,9 +123,15 @@ def serveur_pret():
 def assurer_serveur():
     if serveur_pret():
         return
-    subprocess.Popen([sys.executable, str(ICI / "serveur.py")],
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     stdin=subprocess.DEVNULL, start_new_session=True)
+    if chemins.FIGE:
+        # parloir-mcp.exe : le serveur, c'est Parloir.exe (même dossier), lancé sans fenêtre.
+        exe = Path(sys.executable).with_name("Parloir.exe")
+        cmd = [str(exe), "--serveur"]
+    else:
+        cmd = [sys.executable, str(ICI / "serveur.py")]
+    options = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {"start_new_session": True}
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     stdin=subprocess.DEVNULL, close_fds=True, **options)
     for _ in range(40):
         time.sleep(0.25)
         if serveur_pret():

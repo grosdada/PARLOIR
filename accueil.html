@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Parloir</title>
+<style>
+  /* Une colonne de cartes : d'abord l'installation (tant qu'elle n'est pas faite), puis les IA, puis les réglages. */
+  :root {
+    --fond: #f4f1ea; --carte: #fffdf8; --texte: #24211c; --doux: #746d61; --bord: #e2dccf;
+    --bleu: #2f5bd3; --bleu-doux: #e7edfb; --claude: #c2622f; --codex: #11806a;
+    --ok: #1d8a52; --ok-doux: #e3f4ea; --erreur: #b3372b; --erreur-doux: #fbe9e6; --code: #efeadf;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #17161a; --carte: #222126; --texte: #ece8e1; --doux: #a39d92; --bord: #34323a;
+      --bleu: #7393ff; --bleu-doux: #252c45; --claude: #e58a58; --codex: #3fc0a2;
+      --ok: #4cc785; --ok-doux: #1d3327; --erreur: #ff8a7c; --erreur-doux: #3b2220; --code: #2d2b32;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--fond); color: var(--texte); font: 16px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 0 16px; }
+  .page { max-width: 860px; margin: 0 auto; padding: 28px 0 64px; display: flex; flex-direction: column; gap: 22px; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  h1 { font: 600 30px/1 Georgia, "Times New Roman", serif; margin: 0; }
+  .version { font-size: 13px; color: var(--doux); }
+  header .vers-chat { margin-left: auto; }
+  h2 { font: 600 20px/1.2 Georgia, serif; margin: 0; }
+  p { margin: 0; }
+  .doux { color: var(--doux); font-size: 14px; }
+  a { color: var(--bleu); }
+  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .ia { border: 1px solid var(--bord); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--fond); min-width: 0; }
+  .ia .nom { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+  .pastille { width: 10px; height: 10px; border-radius: 50%; background: var(--bord); flex: none; }
+  .pastille.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+  .ia .etat { font-size: 13px; color: var(--doux); }
+  .ia .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+  button, .bouton { font: inherit; font-size: 15px; border-radius: 10px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  button:hover, .bouton:hover { border-color: var(--doux); }
+  button.principal, .bouton.principal { background: var(--bleu); border-color: transparent; color: #fff; font-weight: 600; }
+  button.principal:hover { filter: brightness(1.08); }
+  button.geant { font-size: 19px; padding: 14px 34px; border-radius: 14px; align-self: flex-start; }
+  button:disabled { opacity: .55; cursor: default; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+
+  input[type=text], input[type=password], select { font: inherit; font-size: 15px; padding: 9px 12px; border: 1px solid var(--bord); border-radius: 10px; background: var(--carte); color: var(--texte); width: 100%; min-width: 0; }
+  label.case { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  label.case input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--bleu); }
+  .ligne { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ligne > input, .ligne > select { flex: 1; min-width: 180px; }
+
+  .bienvenue { border: 2px solid var(--bleu); }
+  .bienvenue h2 { font-size: 26px; }
+  .etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .etapes li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .etapes .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 700; }
+  .etapes .encours .ic { border: 2px solid var(--bleu); border-top-color: transparent; animation: tourne 0.9s linear infinite; }
+  .etapes .ok .ic { background: var(--ok); color: #fff; }
+  .etapes .erreur .ic { background: var(--erreur); color: #fff; }
+  .etapes .detail { display: block; font-size: 13px; color: var(--doux); overflow-wrap: anywhere; }
+  .etapes .erreur .detail { color: var(--erreur); }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .etapes .encours .ic { animation: none; } }
+
+  .message { border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+  .message.ok { background: var(--ok-doux); color: var(--ok); }
+  .message.erreur { background: var(--erreur-doux); color: var(--erreur); }
+  .message.info { background: var(--bleu-doux); }
+
+  .code { position: relative; background: var(--code); border-radius: 10px; min-width: 0; }
+  .code pre { margin: 0; padding: 14px 92px 14px 14px; overflow-x: auto; font: 13.5px/1.55 ui-monospace, Consolas, "Cascadia Mono", monospace; white-space: pre; }
+  .code .copier { position: absolute; top: 8px; right: 8px; font-size: 13px; padding: 5px 10px; }
+  .code .copier.fait { color: var(--ok); border-color: var(--ok); }
+  .fichier { font: 13px ui-monospace, Consolas, monospace; background: var(--code); padding: 2px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+
+  .suggestions { display: flex; gap: 8px; flex-wrap: wrap; }
+  details summary { cursor: pointer; color: var(--doux); font-size: 14px; }
+  .bas { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .barre-prog { height: 8px; background: var(--code); border-radius: 99px; overflow: hidden; }
+  .barre-prog i { display: block; height: 100%; background: var(--bleu); width: 0; transition: width .3s; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Le Parloir</h1>
+    <span class="version" id="version"></span>
+    <a class="bouton principal vers-chat" href="/">Ouvrir la messagerie →</a>
+  </header>
+
+  <!-- 1. Installation (première fois) -->
+  <section class="carte bienvenue" id="bienvenue" hidden>
+    <h2>Bienvenue !</h2>
+    <p>Le Parloir réunit tes IA dans une même conversation. Un clic, et tout s'installe.</p>
+    <label class="case"><input type="checkbox" id="optClaude" checked><span><b>Claude</b> (Claude Code)<br><span class="doux">Il te faudra un compte Claude. Tu te connecteras la première fois.</span></span></label>
+    <label class="case"><input type="checkbox" id="optCodex" checked><span><b>Codex</b> (OpenAI)<br><span class="doux">Il te faudra un compte ChatGPT ou OpenAI.</span></span></label>
+    <button class="principal geant" id="installer">Installer</button>
+    <p class="doux">Windows peut te demander une ou deux autorisations pendant l'installation : réponds « Oui ». Compte quelques minutes.</p>
+    <ol class="etapes" id="etapes"></ol>
+  </section>
+
+  <!-- 2. Les IA -->
+  <section class="carte" id="ias" hidden>
+    <h2>Tes IA</h2>
+    <p class="doux">Clique pour faire entrer une IA : sa fenêtre s'ouvre et elle rejoint la messagerie toute seule.</p>
+    <div class="grille">
+      <div class="ia" id="carteClaude">
+        <div class="nom"><i class="pastille" id="pClaude"></i>Claude</div>
+        <div class="etat" id="eClaude"></div>
+        <div class="actions"><button class="principal" data-lancer="claude">Faire entrer Claude</button></div>
+      </div>
+      <div class="ia" id="carteCodex">
+        <div class="nom"><i class="pastille" id="pCodex"></i>Codex</div>
+        <div class="etat" id="eCodex"></div>
+        <div class="actions"><button class="principal" data-lancer="codex">Faire entrer Codex</button></div>
+      </div>
+    </div>
+    <div class="message" id="msgIa" hidden></div>
+  </section>
+
+  <!-- 3. Invités par API -->
+  <section class="carte" id="api" hidden>
+    <h2>Inviter d'autres IA</h2>
+    <p class="doux">Grok, DeepSeek, GPT, Mistral, Gemini… Colle ta clé API une fois, puis fais-les entrer ou sortir d'un clic. Les clés restent sur ce PC.</p>
+    <div class="grille" id="fournisseurs"></div>
+  </section>
+
+  <!-- 4. Générateur d'instructions -->
+  <section class="carte" id="generateur" hidden>
+    <h2>Connecter un autre logiciel d'IA</h2>
+    <p class="doux">Pour une IA installée sur ce PC qui sait utiliser des « serveurs MCP » (Gemini CLI, Cursor, Claude Desktop…). Choisis-la, puis copie le réglage dans le fichier indiqué.</p>
+    <div class="ligne">
+      <select id="gLogiciel" aria-label="Logiciel"></select>
+      <input type="text" id="gNom" placeholder="Nom dans le parloir" aria-label="Nom dans le parloir">
+    </div>
+    <div id="gSortie" style="display:flex;flex-direction:column;gap:12px"></div>
+  </section>
+
+  <!-- 5. Mémoire partagée -->
+  <section class="carte" id="memoire" hidden>
+    <h2>Mémoire partagée entre tes PC</h2>
+    <p class="doux">Range les conversations dans un dossier synchronisé (Google Drive, Dropbox, OneDrive…) : tous tes PC partageront le même historique.</p>
+    <p>Dossier actuel : <span class="fichier" id="mActuel"></span></p>
+    <div class="suggestions" id="mSuggestions"></div>
+    <div class="ligne">
+      <input type="text" id="mChemin" placeholder="ou colle le chemin d'un dossier, ex. G:\Mon Drive\Parloir" aria-label="Dossier de la mémoire">
+    </div>
+    <div class="ligne">
+      <input type="text" id="mMachine" placeholder="Nom de ce PC" aria-label="Nom de ce PC">
+      <button class="principal" id="mValider">Utiliser ce dossier</button>
+    </div>
+    <p class="doux">Donne un nom différent à chaque PC (ex. « PC-Salon », « PC-Bureau »).</p>
+    <div class="message" id="mMsg" hidden></div>
+  </section>
+
+  <!-- 6. Mise à jour -->
+  <section class="carte" id="maj">
+    <div class="bas">
+      <div>
+        <h2>Mise à jour</h2>
+        <p class="doux" id="majTexte">Version installée : …</p>
+      </div>
+      <div class="ligne">
+        <button id="majVerifier">Vérifier</button>
+        <button class="principal" id="majInstaller" hidden>Mettre à jour</button>
+      </div>
+    </div>
+    <div class="barre-prog" id="majBarre" hidden><i></i></div>
+    <div class="message" id="majMsg" hidden></div>
+  </section>
+
+  <div class="bas">
+    <span class="doux" id="donnees"></span>
+    <button id="quitter">Quitter le parloir</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let E = null;          // dernier état reçu
+let installPrec = false;
+const signatures = {};
+function change(cle, valeur) { const v = JSON.stringify(valeur); if (signatures[cle] === v) return false; signatures[cle] = v; return true; }
+
+function echapper(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+async function post(action, donnees = {}) {
+  const r = await fetch('/api/systeme/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' }, body: JSON.stringify(donnees) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.erreur || 'erreur');
+  return d;
+}
+function message(el, texte, genre) { el.hidden = !texte; el.className = 'message ' + (genre || 'info'); el.textContent = texte || ''; }
+
+function brancherCopie(racine) {
+  racine.querySelectorAll('.code').forEach(bloc => {
+    if (bloc.querySelector('.copier')) return;
+    const b = document.createElement('button'); b.className = 'copier'; b.type = 'button'; b.textContent = 'Copier';
+    b.addEventListener('click', () => {
+      const t = bloc.querySelector('pre').textContent;
+      const fait = () => { b.classList.add('fait'); b.textContent = 'Copié ✓'; setTimeout(() => { b.classList.remove('fait'); b.textContent = 'Copier'; }, 1600); };
+      try { navigator.clipboard.writeText(t).then(fait, () => selection(bloc)); } catch (e) { selection(bloc); }
+    });
+    bloc.appendChild(b);
+  });
+}
+function selection(bloc) { const r = document.createRange(); r.selectNodeContents(bloc.querySelector('pre')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+// ---------- état ----------
+async function rafraichir() {
+  try { E = await (await fetch('/api/systeme')).json(); } catch (e) { return; }
+  $('version').textContent = 'version ' + E.version;
+  $('donnees').textContent = 'Réglages et clés : ' + E.dossier_donnees;
+
+  // Installation
+  const enCours = E.install.en_cours, etapes = E.install.etapes;
+  $('bienvenue').hidden = E.installe && !enCours && !etapes.length;
+  const fini = installPrec && !enCours;
+  installPrec = enCours;
+  $('installer').disabled = enCours;
+  $('installer').textContent = enCours ? 'Installation en cours…' : (etapes.length ? 'Recommencer' : 'Installer');
+  if (change('e', etapes)) $('etapes').innerHTML = etapes.map(e => `<li class="${e.etat}"><span class="ic">${e.etat === 'ok' ? '✓' : e.etat === 'erreur' ? '!' : ''}</span><span>${echapper(e.nom)}${e.detail && e.detail !== 'branché' ? `<span class="detail">${echapper(e.detail)}</span>` : ''}</span></li>`).join('');
+  if (fini && etapes.every(e => e.etat === 'ok')) {
+    $('etapes').insertAdjacentHTML('afterend', '<div class="message ok" id="installOk">C\'est prêt ! Clique sur « Faire entrer Claude » ci-dessous.</div>');
+  }
+  const pret = E.installe;
+  for (const id of ['ias', 'api', 'generateur', 'memoire']) $(id).hidden = !pret;
+
+  // Claude / Codex
+  for (const [ia, nom] of [['claude', 'Claude'], ['codex', 'Codex']]) {
+    $('e' + nom).textContent = E[ia] ? 'Installé et branché au parloir.' : 'Pas encore installé.';
+    const btn = document.querySelector(`[data-lancer="${ia}"]`);
+    btn.textContent = E[ia] ? `Faire entrer ${nom}` : `Installer ${nom}`;
+    btn.dataset.mode = E[ia] ? 'lancer' : 'installer';
+  }
+
+  // Invités API (on ne redessine pas pendant qu'on tape)
+  if (!$('fournisseurs').contains(document.activeElement) && change('f', E.fournisseurs)) dessinerFournisseurs();
+
+  // Mémoire
+  $('mActuel').textContent = E.memoire;
+  if (document.activeElement !== $('mMachine') && !$('mMachine').value) $('mMachine').value = E.machine;
+  if (change('s', E.suggestions)) $('mSuggestions').innerHTML = E.suggestions.map(s => `<button type="button" data-chemin="${echapper(s.chemin)}">${echapper(s.nom)}</button>`).join('');
+  $('mSuggestions').querySelectorAll('button:not([data-ok])').forEach(b => { b.dataset.ok = 1; b.addEventListener('click', () => { $('mChemin').value = b.dataset.chemin; }); });
+
+  // Mise à jour
+  majAfficher(E.maj);
+  if (!$('gLogiciel').options.length) initGenerateur();
+}
+
+async function presence() {
+  try {
+    const p = (await (await fetch('/api/presence')).json()).presence;
+    $('pClaude').classList.toggle('on', p.Claude === 'present');
+    $('pCodex').classList.toggle('on', p.Codex === 'present');
+  } catch (e) {}
+}
+
+// ---------- installation ----------
+$('installer').addEventListener('click', async () => {
+  document.getElementById('installOk')?.remove();
+  await post('installer', { claude: $('optClaude').checked, codex: $('optCodex').checked });
+  rafraichir();
+});
+
+document.querySelectorAll('[data-lancer]').forEach(b => b.addEventListener('click', async () => {
+  const ia = b.dataset.lancer;
+  try {
+    if (b.dataset.mode === 'installer') {
+      await post('installer', { claude: ia === 'claude', codex: ia === 'codex' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      message($('msgIa'), '');
+    } else {
+      await post('lancer', { ia });
+      message($('msgIa'), `La fenêtre de ${ia === 'claude' ? 'Claude' : 'Codex'} s'ouvre. La première fois, elle peut te demander de te connecter à ton compte ou d'accepter le dossier : réponds oui. Ensuite, elle rejoint la messagerie.`, 'ok');
+    }
+  } catch (e) { message($('msgIa'), e.message, 'erreur'); }
+  rafraichir();
+}));
+
+// ---------- invités par API ----------
+function dessinerFournisseurs() {
+  $('fournisseurs').innerHTML = Object.entries(E.fournisseurs).map(([k, f]) => `
+    <div class="ia" data-f="${k}">
+      <div class="nom"><i class="pastille ${f.present ? 'on' : ''}"></i>${echapper(f.nom)}</div>
+      ${f.cle ? `<input type="password" placeholder="${f.a_cle ? 'Clé enregistrée ✓ (coller pour changer)' : 'Colle ta clé API ici'}" aria-label="Clé API ${echapper(f.nom)}" data-champ="cle" autocomplete="off">
+        <span class="etat"><a href="${f.lien}" target="_blank" rel="noopener">Obtenir une clé ${echapper(f.nom)}</a></span>`
+        : `<span class="etat">Modèle local, sans clé. <a href="${f.lien}" target="_blank" rel="noopener">Installer Ollama</a></span>`}
+      <details><summary>Modèle : ${echapper(f.modele_choisi)}</summary><input type="text" value="${echapper(f.modele_choisi)}" data-champ="modele" aria-label="Modèle" style="margin-top:8px"></details>
+      <div class="actions">
+        ${f.present ? `<button data-act="renvoyer">Faire sortir</button>` : `<button class="principal" data-act="inviter">Faire entrer ${echapper(f.nom)}</button>`}
+      </div>
+      <div class="message" hidden></div>
+    </div>`).join('');
+  $('fournisseurs').querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
+    const carte = b.closest('[data-f]'), k = carte.dataset.f, msg = carte.querySelector('.message');
+    b.disabled = true;
+    try {
+      if (b.dataset.act === 'inviter') {
+        const cle = carte.querySelector('[data-champ=cle]')?.value || null;
+        const modele = carte.querySelector('[data-champ=modele]')?.value || null;
+        message(msg, 'Connexion…');
+        await post('inviter', { fournisseur: k, cle, modele });
+      } else {
+        await post('renvoyer', { fournisseur: k });
+      }
+      document.activeElement?.blur();
+      await rafraichir();
+    } catch (e) { message(msg, e.message, 'erreur'); b.disabled = false; }
+  }));
+}
+
+// ---------- générateur d'instructions ----------
+const LOGICIELS = {
+  gemini:  { nom: 'Gemini CLI', invite: 'Gemini', fichier: { w: '%USERPROFILE%\\.gemini\\settings.json', u: '~/.gemini/settings.json' }, format: 'mcpServers', extra: { timeout: 120000 } },
+  cursor:  { nom: 'Cursor', invite: 'Cursor', fichier: { w: '%USERPROFILE%\\.cursor\\mcp.json', u: '~/.cursor/mcp.json' }, format: 'mcpServers' },
+  desktop: { nom: 'Claude Desktop', invite: 'Claude-Desktop', fichier: { w: '%APPDATA%\\Claude\\claude_desktop_config.json', u: '~/Library/Application Support/Claude/claude_desktop_config.json' }, format: 'mcpServers', note: 'Ou dans Claude Desktop : Réglages → Développeur → Modifier la configuration.' },
+  windsurf:{ nom: 'Windsurf', invite: 'Windsurf', fichier: { w: '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json', u: '~/.codeium/windsurf/mcp_config.json' }, format: 'mcpServers' },
+  vscode:  { nom: 'VS Code (Copilot)', invite: 'Copilot', fichier: { w: '.vscode\\mcp.json (dans ton projet)', u: '.vscode/mcp.json (dans ton projet)' }, format: 'servers' },
+  codex:   { nom: 'Codex (sur un autre réglage)', invite: 'Codex', fichier: { w: '%USERPROFILE%\\.codex\\config.toml', u: '~/.codex/config.toml' }, format: 'toml' },
+  claude:  { nom: 'Claude Code (à la main)', invite: 'Claude', fichier: null, format: 'cli' },
+  autre:   { nom: 'Autre logiciel MCP', invite: 'Invité', fichier: null, format: 'generique' },
+};
+
+function initGenerateur() {
+  $('gLogiciel').innerHTML = Object.entries(LOGICIELS).map(([k, l]) => `<option value="${k}">${echapper(l.nom)}</option>`).join('');
+  $('gLogiciel').addEventListener('change', () => { $('gNom').value = LOGICIELS[$('gLogiciel').value].invite; generer(); });
+  $('gNom').addEventListener('input', generer);
+  $('gNom').value = LOGICIELS.gemini.invite;
+  generer();
+}
+
+function bloc(code) { return `<div class="code"><pre>${echapper(code)}</pre></div>`; }
+
+function generer() {
+  if (!E) return;
+  const l = LOGICIELS[$('gLogiciel').value];
+  const nom = ($('gNom').value.trim() || l.invite).replace(/\s+/g, '-');
+  const [commande, ...args] = E.commande_mcp.map(a => a === 'NOM' ? nom : a);
+  const serveur = { command: commande, args, ...(l.extra || {}) };
+  let html = '';
+  if (l.format === 'mcpServers' || l.format === 'servers') {
+    const cfg = l.format === 'servers' ? { servers: { parloir: { type: 'stdio', ...serveur } } } : { mcpServers: { parloir: serveur } };
+    html += `<p><b>1.</b> Ouvre le fichier <span class="fichier">${echapper(E.windows ? l.fichier.w : l.fichier.u)}</span> (crée-le s'il n'existe pas) et colle :</p>${bloc(JSON.stringify(cfg, null, 2))}
+      <p class="doux">Si le fichier contient déjà d'autres serveurs, ajoute seulement le bloc <b>"parloir"</b> à côté des autres, dans <b>"${l.format}"</b>.${l.note ? ' ' + l.note : ''}</p>`;
+  } else if (l.format === 'toml') {
+    const q = s => s.includes("'") ? JSON.stringify(s) : `'${s}'`;
+    html += `<p><b>1.</b> Ajoute à la fin de <span class="fichier">${echapper(E.windows ? l.fichier.w : l.fichier.u)}</span> :</p>
+      ${bloc(`[mcp_servers.parloir]\ncommand = ${q(commande)}\nargs = [${args.map(q).join(', ')}]\ntool_timeout_sec = 120`)}`;
+  } else if (l.format === 'cli') {
+    const q = s => /\s/.test(s) ? `"${s}"` : s;
+    html += `<p><b>1.</b> Dans un terminal, tape :</p>${bloc(`claude mcp add --scope user parloir -- ${[commande, ...args].map(q).join(' ')}`)}`;
+  } else {
+    html += `<p><b>1.</b> Dans les réglages MCP du logiciel, ajoute un serveur de type <b>stdio</b> :</p>
+      ${bloc(`Nom : parloir\nCommande : ${commande}\nArguments : ${args.join(' ')}`)}`;
+  }
+  html += `<p><b>2.</b> Redémarre le logiciel, puis dis-lui :</p>${bloc('Connecte-toi au parloir')}
+    <details><summary>Si l'IA ne reste pas à l'écoute, colle-lui aussi cette consigne</summary><div style="margin-top:10px">${bloc(
+`Tu es « ${nom} » dans Le Parloir, une messagerie de groupe entre moi et plusieurs IA.
+Appelle parloir_entrer, puis boucle sans t'arrêter : parloir_attendre → si un message arrive, réponds avec parloir_ecrire si c'est utile → parloir_attendre.
+Réponds toujours à « Toi » (moi), sauf si je m'adresse à une autre IA avec @Nom. Ne réponds aux autres IA que si tu apportes quelque chose de neuf.
+Quand j'écris /quitter, appelle parloir_quitter et arrête.`)}</div></details>`;
+  $('gSortie').innerHTML = html;
+  brancherCopie($('gSortie'));
+}
+
+// ---------- mémoire ----------
+$('mValider').addEventListener('click', async () => {
+  const chemin = $('mChemin').value.trim();
+  if (!chemin) return message($('mMsg'), 'Choisis un dossier ci-dessus ou colle son chemin.', 'erreur');
+  try {
+    await post('memoire', { chemin, machine: $('mMachine').value.trim() });
+    message($('mMsg'), 'C\'est fait. Les conversations de ce PC sont maintenant rangées dans ce dossier.', 'ok');
+    $('mChemin').value = '';
+    rafraichir();
+  } catch (e) { message($('mMsg'), e.message, 'erreur'); }
+});
+
+// ---------- mise à jour ----------
+function majAfficher(m) {
+  let t = 'Version installée : ' + E.version;
+  if (m.derniere) t += m.disponible ? ` · nouvelle version ${m.derniere} disponible` : ' · tu as la dernière version';
+  $('majTexte').textContent = t;
+  $('majInstaller').hidden = !m.disponible || !E.fige;
+  $('majInstaller').disabled = m.en_cours;
+  $('majBarre').hidden = !m.en_cours;
+  $('majBarre').firstElementChild.style.width = (m.progression || 0) + '%';
+  if (m.erreur) message($('majMsg'), m.erreur, 'erreur');
+  else if (m.disponible && !E.fige) message($('majMsg'), 'Tu utilises la version « script » : fais « git pull » dans le dossier du parloir.', 'info');
+}
+$('majVerifier').addEventListener('click', async () => {
+  $('majVerifier').disabled = true; message($('majMsg'), '');
+  try { await post('verifier_maj'); } catch (e) { message($('majMsg'), e.message, 'erreur'); }
+  $('majVerifier').disabled = false; rafraichir();
+});
+$('majInstaller').addEventListener('click', async () => {
+  await post('mettre_a_jour');
+  message($('majMsg'), 'Téléchargement… L\'app va redémarrer toute seule, puis cette page se rechargera.', 'info');
+  attendreRetour();
+});
+function attendreRetour() {
+  let absent = false;
+  const t = setInterval(async () => {
+    try {
+      await fetch('/api/presence');
+      if (absent) { clearInterval(t); location.reload(); }
+    } catch (e) { absent = true; }
+  }, 1500);
+}
+
+// ---------- quitter ----------
+$('quitter').addEventListener('click', async () => {
+  if ($('quitter').dataset.sur !== '1') { $('quitter').dataset.sur = '1'; $('quitter').textContent = 'Sûr ? Clique encore pour quitter'; setTimeout(() => { $('quitter').dataset.sur = ''; $('quitter').textContent = 'Quitter le parloir'; }, 4000); return; }
+  try { await post('quitter'); } catch (e) {}
+  document.querySelector('.page').innerHTML = '<div class="carte"><h2>Le parloir est fermé.</h2><p>Pour le rouvrir, double-clique sur « Le Parloir » sur ton Bureau.</p></div>';
+});
+
+rafraichir(); presence();
+setInterval(() => { rafraichir(); presence(); }, 2000);
+</script>
+</body>
+</html>

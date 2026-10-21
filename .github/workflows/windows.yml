@@ -1,0 +1,82 @@
+name: Fabriquer Parloir.exe
+
+# Une étiquette « vX.Y.Z » poussée sur GitHub fabrique l'exe et le publie dans les Releases.
+# On peut aussi lancer la fabrication à la main (onglet Actions) pour tester, sans publier.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Outils
+        run: pip install pyinstaller==6.11.1
+
+      - name: Numéro de version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "${GITHUB_REF_NAME#v}" > version.txt
+          else
+            echo "0.0.0-test.${GITHUB_RUN_NUMBER}" > version.txt
+          fi
+          cat version.txt
+
+      - name: Fabriquer le connecteur (parloir-mcp.exe)
+        run: >
+          pyinstaller --noconfirm --onefile --console --name parloir-mcp
+          --icon assets/parloir.ico --add-data "version.txt;." mcp_parloir.py
+
+      - name: Fabriquer l'application (Parloir.exe)
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name Parloir
+          --icon assets/parloir.ico
+          --add-data "index.html;." --add-data "accueil.html;." --add-data "version.txt;."
+          --add-data "dist/parloir-mcp.exe;."
+          --hidden-import serveur --hidden-import systeme --hidden-import invite
+          app.py
+
+      - name: Tester l'exe
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\Parloir.exe -ArgumentList '--serveur' -PassThru
+          Start-Sleep -Seconds 6
+          $etat = Invoke-RestMethod http://127.0.0.1:7777/api/systeme
+          "Version embarquée : $($etat.version)"
+          $page = Invoke-WebRequest http://127.0.0.1:7777/accueil -UseBasicParsing
+          if ($page.StatusCode -ne 200) { throw "La page d'accueil ne répond pas" }
+          $chat = Invoke-WebRequest http://127.0.0.1:7777/ -UseBasicParsing
+          if ($chat.Content -notmatch 'Le Parloir') { throw "La messagerie ne répond pas" }
+          $mcp = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | dist\parloir-mcp.exe --nom Test
+          "Connecteur : $mcp"
+          if ("$mcp" -notmatch '"parloir"') { throw "Le connecteur MCP ne répond pas" }
+          Stop-Process -Id $p.Id -Force
+          "Tout est bon."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Parloir
+          path: dist/Parloir.exe
+
+      - name: Publier la version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/Parloir.exe \
+            --title "Le Parloir ${GITHUB_REF_NAME#v}" \
+            --notes "Télécharge **Parloir.exe** ci-dessous, puis double-clique dessus.
+
+          Windows affichera sans doute « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**."

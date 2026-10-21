@@ -20,12 +20,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 
-try:
-    _CFG = json.loads((Path(__file__).resolve().parent / "config.json").read_text(encoding="utf-8"))
-except (OSError, json.JSONDecodeError):
-    _CFG = {}
+import chemins
 # Raccourcis : nom affiché, URL de base, modèle par défaut, variable d'environnement de la clé.
 # Les noms de modèles évoluent vite : remplace-les avec --modele si besoin.
 PROFILS = {
@@ -44,7 +40,7 @@ ap.add_argument("--url", help="URL de base de l'API (…/v1)")
 ap.add_argument("--modele", help="nom du modèle")
 ap.add_argument("--cle-env", help="variable d'environnement contenant la clé API")
 ap.add_argument("--personnalite", default="", help="consigne de caractère en plus (facultatif)")
-ap.add_argument("--parloir", default=os.environ.get("PARLOIR_URL", f"http://127.0.0.1:{os.environ.get('PARLOIR_PORT') or _CFG.get('port') or 7777}"))
+ap.add_argument("--parloir", default=os.environ.get("PARLOIR_URL", f"http://127.0.0.1:{chemins.port()}"))
 a = ap.parse_args()
 
 p = PROFILS.get(a.profil, (None, None, None, None))
@@ -77,8 +73,11 @@ _direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # parlo
 def http(methode, url, corps=None, entetes=None, delai=30):
     data = json.dumps(corps).encode("utf-8") if corps is not None else None
     h = {"Content-Type": "application/json", **(entetes or {})}
+    local = url.startswith(PARLOIR)
+    if local:
+        h["X-Parloir"] = "1"
     req = urllib.request.Request(url, data=data, method=methode, headers=h)
-    ouvrir = _direct.open if url.startswith(PARLOIR) else urllib.request.urlopen
+    ouvrir = _direct.open if local else urllib.request.urlopen
     try:
         with ouvrir(req, timeout=delai) as r:
             return json.loads(r.read().decode("utf-8"))
