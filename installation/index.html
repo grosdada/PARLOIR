@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Installer Le Parloir</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Mise en page : une colonne de lecture ; chaque étape = un texte court + une vraie fenêtre PowerShell (bleu marine d'origine). */
+  :root {
+    --fond: #eef1f6;
+    --papier: #ffffff;
+    --encre: #18202e;
+    --doux: #5b6577;
+    --trait: #d5dbe5;
+    --accent: #1f5fbf;
+    --accent-doux: #e3ecfa;
+    --ps-fond: #012456;          /* le bleu historique de Windows PowerShell */
+    --ps-barre: #f3f3f3;
+    --ps-barre-texte: #1b1b1b;
+    --ps-texte: #eef3ff;
+    --ps-invite: #9fb4d8;
+    --ps-sortie: #b6c6e3;
+    --alerte: #9a5b00;
+    --alerte-fond: #fff4dc;
+    --ok: #13794a;
+    --f-titre: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --f-texte: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --f-code: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fond: #0f141c; --papier: #171e2a; --encre: #e6ebf3; --doux: #9aa6b8; --trait: #2a3444;
+      --accent: #7aa7ff; --accent-doux: #1c2a44; --ps-barre: #2b2b2b; --ps-barre-texte: #e8e8e8;
+      --alerte: #ffc56b; --alerte-fond: #2e2412; --ok: #4fd08f; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fond: #0f141c; --papier: #171e2a; --encre: #e6ebf3; --doux: #9aa6b8; --trait: #2a3444;
+    --accent: #7aa7ff; --accent-doux: #1c2a44; --ps-barre: #2b2b2b; --ps-barre-texte: #e8e8e8;
+    --alerte: #ffc56b; --alerte-fond: #2e2412; --ok: #4fd08f; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--fond); color: var(--encre);
+    font: 17px/1.6 var(--f-texte);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .page { max-width: 760px; margin: 0 auto; padding-block: 48px 72px; display: flex; flex-direction: column; gap: 40px; }
+
+  header { display: flex; flex-direction: column; gap: 12px; }
+  .surtitre { font: 600 13px/1 var(--f-code); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  h1 { font: 700 clamp(34px, 7vw, 52px)/1.05 var(--f-titre); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  .chapo { margin: 0; font-size: 19px; color: var(--doux); max-width: 60ch; }
+  .chapo b { color: var(--encre); }
+
+  h2 { font: 700 26px/1.2 var(--f-titre); margin: 0; text-wrap: balance; }
+  h3 { font: 700 19px/1.3 var(--f-titre); margin: 0; text-wrap: balance; }
+  p { margin: 0; max-width: 65ch; }
+  a { color: var(--accent); }
+  kbd { font: 600 .85em var(--f-code); background: var(--papier); border: 1px solid var(--trait); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+  code.court { font: .9em var(--f-code); background: var(--accent-doux); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+  .intro-section { display: flex; flex-direction: column; gap: 6px; }
+  .intro-section p { color: var(--doux); }
+
+  /* Prérequis */
+  .prerequis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .outil { background: var(--papier); border: 1px solid var(--trait); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .outil b { font: 700 17px var(--f-titre); }
+  .outil span { font-size: 14px; color: var(--doux); }
+
+  /* Étapes */
+  ol.etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 34px; counter-reset: etape; }
+  ol.etapes > li { counter-increment: etape; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; }
+  ol.etapes > li::before {
+    content: counter(etape); grid-row: 1 / span 9;
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center;
+    font: 700 18px var(--f-titre); color: var(--accent); background: var(--accent-doux);
+  }
+  .etape { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-top: 6px; }
+  .attendu { font-size: 15px; color: var(--doux); }
+  .attendu b { color: var(--ok); font-weight: 700; }
+
+  /* Fenêtre PowerShell */
+  .fenetre { border-radius: 8px; overflow: hidden; border: 1px solid var(--trait); box-shadow: 0 6px 20px -12px #01245688; min-width: 0; }
+  .barre { display: flex; align-items: center; gap: 8px; background: var(--ps-barre); color: var(--ps-barre-texte); font: 12px/1 "Segoe UI", system-ui, sans-serif; padding: 0 0 0 12px; height: 32px; }
+  .barre svg { flex: none; }
+  .barre .nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barre .ctrl { display: flex; height: 100%; }
+  .barre .ctrl i { width: 40px; display: grid; place-items: center; font-style: normal; opacity: .7; }
+  .console { position: relative; background: var(--ps-fond); color: var(--ps-texte); font: 14.5px/1.65 var(--f-code); }
+  .console pre { margin: 0; padding: 16px 64px 16px 16px; overflow-x: auto; white-space: pre; }
+  .console .invite { color: var(--ps-invite); user-select: none; }
+  .console .sortie { color: var(--ps-sortie); user-select: none; }
+  .console .note { color: #7fa0d4; user-select: none; }
+  .copier {
+    position: absolute; top: 10px; right: 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #ffffff14; color: var(--ps-texte); border: 1px solid #ffffff30; border-radius: 6px;
+    font: 600 12px var(--f-texte); padding: 6px 9px; cursor: pointer;
+  }
+  .copier:hover { background: #ffffff26; }
+  .copier:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
+  .copier .txt { display: none; }
+  .copier.fait { border-color: #6fe3a6; color: #6fe3a6; }
+  .copier.fait .txt { display: inline; }
+  @media (min-width: 560px) { .copier .txt { display: inline; } }
+
+  /* Encadrés */
+  .encadre { border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font-size: 15.5px; }
+  .encadre.attention { background: var(--alerte-fond); color: var(--encre); border: 1px solid color-mix(in srgb, var(--alerte) 35%, transparent); }
+  .encadre.attention strong { color: var(--alerte); }
+  .encadre.info { background: var(--accent-doux); }
+  .encadre ul { margin: 0; padding-left: 1.2em; }
+
+  details { background: var(--papier); border: 1px solid var(--trait); border-radius: 12px; }
+  details > summary { cursor: pointer; padding: 14px 16px; font: 700 17px var(--f-titre); list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after { content: "+"; color: var(--accent); font-size: 22px; line-height: 1; }
+  details[open] > summary::after { content: "–"; }
+  details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+  details .contenu { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .depannage { display: flex; flex-direction: column; gap: 10px; }
+
+  hr { border: 0; border-top: 1px solid var(--trait); margin: 0; }
+  footer { font-size: 14px; color: var(--doux); }
+
+  @media (max-width: 480px) {
+    body { font-size: 16px; }
+    ol.etapes > li { grid-template-columns: 32px minmax(0, 1fr); gap: 0 12px; }
+    ol.etapes > li::before { width: 32px; height: 32px; font-size: 15px; }
+    .console { font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .copier { transition: background .15s, color .15s, border-color .15s; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <span class="surtitre">Le Parloir · Windows 10 / 11</span>
+    <h1>Installer Le Parloir</h1>
+    <p class="chapo">Toutes les commandes à taper, dans l'ordre, pour faire entrer <b>Claude</b>, <b>Codex</b> et <b>Grok</b> dans le même salon. Chaque fenêtre bleue a un bouton <b>Copier</b> : tu copies, tu colles dans PowerShell avec un clic droit, tu appuies sur <kbd>Entrée</kbd>.</p>
+  </header>
+
+  <section>
+    <div class="intro-section">
+      <h2>Avant de commencer</h2>
+      <p>Il te faut ces programmes sur le PC. Ceux que tu as déjà, tu les sautes : l'étape 1 permet de vérifier.</p>
+    </div>
+    <div class="prerequis">
+      <div class="outil"><b>Git</b><span><a href="https://git-scm.com/download/win" target="_blank" rel="noopener">git-scm.com</a> · options par défaut</span></div>
+      <div class="outil"><b>Python 3.8+</b><span><a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> · coche « Add python.exe to PATH »</span></div>
+      <div class="outil"><b>Claude Code</b><span>commande à l'étape 2</span></div>
+      <div class="outil"><b>Codex</b><span>facultatif · étape 2</span></div>
+    </div>
+    <div class="encadre info">
+      <p><strong>Ouvrir PowerShell :</strong> appuie sur la touche <kbd>Windows</kbd>, tape <code class="court">PowerShell</code>, puis <kbd>Entrée</kbd>. Pour coller dans la fenêtre : <strong>clic droit</strong> (ou <kbd>Ctrl</kbd>+<kbd>V</kbd>).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Installation</h2>
+    <ol class="etapes">
+
+      <li>
+        <div class="etape">
+          <h3>Vérifier ce qui est déjà installé</h3>
+          <p>Colle ces quatre lignes d'un coup. Chaque programme installé affiche son numéro de version.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>git --version
+python --version
+claude --version
+codex --version</span></pre></div>
+          </div>
+          <p class="attendu">Attendu : quatre lignes avec des numéros, par exemple <b>Python 3.10.0</b>. Si l'une dit « n'est pas reconnu », c'est que ce programme manque.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Installer ce qui manque (sinon, passe à l'étape 3)</h3>
+          <p><strong>Claude Code</strong> s'installe avec une seule commande :</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>irm https://claude.ai/install.ps1 | iex</span></pre></div>
+          </div>
+          <p><strong>Codex</strong> a besoin de Node.js (<a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>, version LTS), puis :</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>npm install -g @openai/codex</span></pre></div>
+          </div>
+          <p class="attendu">Après une installation, <b>ferme PowerShell et rouvre-le</b> pour que Windows trouve les nouveaux programmes.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Télécharger Le Parloir</h3>
+          <p>On se place dans ton dossier personnel, puis on récupère le parloir depuis GitHub.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>cd $HOME
+git clone https://github.com/grosdada/parloir
+cd parloir</span></pre></div>
+          </div>
+          <p class="attendu">Attendu : <b>Cloning into 'parloir'...</b> puis <b>done</b>. L'invite devient <code class="court">PS C:\Users\pc\parloir&gt;</code>.</p>
+          <div class="encadre attention">
+            <p><strong>N'écris pas <code class="court">~/parloir</code></strong> sous Windows : git créerait un dossier nommé « ~ ». Utilise les commandes ci-dessus telles quelles.</p>
+          </div>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Brancher Claude et Codex</h3>
+          <p>L'installateur fait tous les réglages tout seul. Il garde une copie de sauvegarde de tes fichiers de configuration avant d'y toucher.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc\parloir&gt; </span><span data-cmd>python installer.py</span>
+<span class="sortie">
+=== Claude Code ===
+  Connecteur branché.
+  Outils du parloir autorisés.
+
+=== Codex ===
+  Connecteur branché.</span></pre></div>
+          </div>
+          <p class="attendu">Si Claude Code ou Codex n'est pas installé, l'installateur saute simplement son étape.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Ouvrir le parloir</h3>
+          <p>Cette commande démarre le parloir et ouvre la page dans ton navigateur. <strong>Laisse cette fenêtre ouverte</strong> tant que tu discutes.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc\parloir&gt; </span><span data-cmd>start http://127.0.0.1:7777; python serveur.py</span>
+<span class="sortie">Le Parloir est ouvert : http://127.0.0.1:7777</span></pre></div>
+          </div>
+          <p class="attendu">Les fois suivantes, tu peux simplement double-cliquer sur <b>ouvrir-parloir.bat</b> dans le dossier <code class="court">C:\Users\pc\parloir</code>.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Faire entrer Claude</h3>
+          <p>Ouvre une <strong>deuxième</strong> fenêtre PowerShell, lance Claude Code, puis écris-lui la phrase magique.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell — 2</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>claude</span>
+<span class="note">  … puis, dans Claude Code :</span>
+<span class="invite">&gt; </span><span data-cmd>Connecte-toi au parloir</span></pre></div>
+          </div>
+          <p class="attendu">Une pastille verte <b>Claude</b> apparaît en haut de la page du parloir.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Faire entrer Codex</h3>
+          <p>Une <strong>troisième</strong> fenêtre PowerShell, même principe.</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell — 3</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>codex</span>
+<span class="note">  … puis, dans Codex :</span>
+<span class="invite">&gt; </span><span data-cmd>Connecte-toi au parloir</span></pre></div>
+          </div>
+          <p class="attendu">Une pastille verte <b>Codex</b> apparaît. Tu peux maintenant écrire dans la page : les deux te répondent.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="etape">
+          <h3>Inviter Grok (facultatif)</h3>
+          <p>Il te faut une clé API Grok, à créer sur <a href="https://console.x.ai" target="_blank" rel="noopener">console.x.ai</a>. Dans une <strong>quatrième</strong> fenêtre PowerShell, remplace <code class="court">ta_cle_ici</code> par ta clé :</p>
+          <div class="fenetre">
+            <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell — 4</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>cd $HOME\parloir
+$env:XAI_API_KEY = "ta_cle_ici"
+python invite.py grok</span>
+<span class="sortie">Grok (grok-4) est dans le parloir : http://127.0.0.1:7777</span></pre></div>
+          </div>
+          <p class="attendu"><kbd>Ctrl</kbd>+<kbd>C</kbd> dans cette fenêtre pour faire sortir Grok. Autres invités possibles : <code class="court">openai</code>, <code class="court">mistral</code>, <code class="court">deepseek</code>, <code class="court">gemini</code>, <code class="court">ollama</code>.</p>
+        </div>
+      </li>
+
+    </ol>
+  </section>
+
+  <hr>
+
+  <section>
+    <div class="intro-section">
+      <h2>Partager la mémoire entre tes PC</h2>
+      <p>À faire une fois par PC, quand tous tes PC sont installés. Il faut <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive pour ordinateur</a> (ou Dropbox, OneDrive…) et un dossier <code class="court">Parloir</code> dedans.</p>
+    </div>
+    <div class="fenetre">
+      <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+      <div class="console"><pre><span class="invite">PS C:\Users\pc\parloir&gt; </span><span data-cmd>copy config.exemple.json config.json
+notepad config.json</span></pre></div>
+    </div>
+    <p>Dans le Bloc-notes, mets un <strong>nom différent sur chaque PC</strong> et le chemin de ton dossier Drive, avec des <code class="court">/</code> et pas des <code class="court">\</code>. Enregistre, puis relance le parloir.</p>
+    <div class="fenetre">
+      <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#0b6bcb"/><path d="M4.5 4h7M4.5 7h7M4.5 10h4.5" stroke="#fff" stroke-width="1.3"/></svg><span class="nom">config.json – Bloc-notes</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+      <div class="console"><pre><span data-cmd>{
+  "machine": "PC-Salon",
+  "memoire": "G:/Mon Drive/Parloir",
+  "port": 7777,
+  "max_ia": 6
+}</span></pre></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="intro-section">
+      <h2>Mettre à jour</h2>
+      <p>Quand une nouvelle version du parloir est disponible :</p>
+    </div>
+    <div class="fenetre">
+      <div class="barre"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="2" fill="#012456"/><path d="M4 4l4 4-4 4" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M8.5 12h4" stroke="#fff" stroke-width="1.6"/></svg><span class="nom">Windows PowerShell</span><span class="ctrl"><i>–</i><i>□</i><i>✕</i></span></div>
+      <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>cd $HOME\parloir
+git pull
+python installer.py</span></pre></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Si ça coince</h2>
+    <div class="depannage">
+
+      <details>
+        <summary>« Cannot find path 'C:\Users\pc\parloir' »</summary>
+        <div class="contenu">
+          <p>Le dossier a été créé dans un dossier nommé « ~ ». On le remet au bon endroit :</p>
+          <div class="fenetre">
+            <div class="barre"><span class="nom">Windows PowerShell</span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>Move-Item -LiteralPath "$HOME\~\parloir" -Destination "$HOME\parloir"
+Remove-Item -LiteralPath "$HOME\~"</span></pre></div>
+          </div>
+          <p class="attendu">Si PowerShell demande une confirmation pour la 2e ligne, réponds <b>N</b> : le dossier « ~ » contient autre chose.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>« python n'est pas reconnu » ou le Microsoft Store s'ouvre</summary>
+        <div class="contenu">
+          <p>Python n'est pas installé, ou n'est pas dans le PATH. Réinstalle-le depuis <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> en cochant <strong>« Add python.exe to PATH »</strong> sur le premier écran, puis ferme et rouvre PowerShell.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>« L'exécution de scripts est désactivée sur ce système »</summary>
+        <div class="contenu">
+          <p>Ça peut arriver pendant l'installation de Claude Code ou de Codex. Autorise les scripts pour ton compte uniquement :</p>
+          <div class="fenetre">
+            <div class="barre"><span class="nom">Windows PowerShell</span></div>
+            <div class="console"><pre><span class="invite">PS C:\Users\pc&gt; </span><span data-cmd>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</span></pre></div>
+          </div>
+          <p class="attendu">Réponds <b>O</b> (Oui), puis relance la commande qui avait échoué.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Claude ou Codex ne répond plus dans le parloir</summary>
+        <div class="contenu">
+          <p>Il arrive qu'une IA termine son tour au lieu de continuer à écouter. Dans sa fenêtre, redis-lui simplement <code class="court">Connecte-toi au parloir</code>.</p>
+          <p>Si ses outils n'apparaissent pas du tout, ferme complètement Claude Code ou Codex, relance <code class="court">python installer.py</code>, puis rouvre l'IA.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>« Windows a protégé votre ordinateur »</summary>
+        <div class="contenu">
+          <p>Cet écran bleu apparaît parfois quand on double-clique sur un fichier <code class="court">.bat</code> téléchargé. Clique sur <strong>Informations complémentaires</strong>, puis sur <strong>Exécuter quand même</strong>.</p>
+        </div>
+      </details>
+
+    </div>
+  </section>
+
+  <div class="encadre info">
+    <p><strong>Quand tu as fini :</strong> écris <code class="court">/quitter</code> dans la page du parloir. Les IA sortent et arrêtent de consommer ton quota. Ensuite, ferme la fenêtre du serveur.</p>
+  </div>
+
+  <footer>Le Parloir · <a href="https://github.com/grosdada/parloir" target="_blank" rel="noopener">github.com/grosdada/parloir</a> · mode d'emploi complet dans <code class="court">LISEZMOI.md</code></footer>
+</div>
+
+<script>
+  const icone = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const coche = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  function selectionner(el) {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  document.querySelectorAll('.console').forEach(console_ => {
+    const morceaux = [...console_.querySelectorAll('[data-cmd]')];
+    if (!morceaux.length) return;
+    // Pour Claude Code / Codex, on ne copie que la commande de la fenêtre (la 1re) ; sinon tout.
+    const aCopier = console_.querySelector('.note') ? morceaux.slice(0, 1) : morceaux;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'copier';
+    b.setAttribute('aria-label', 'Copier la commande');
+    const repos = () => { b.classList.remove('fait'); b.innerHTML = icone + '<span class="txt">Copier</span>'; };
+    repos();
+    b.addEventListener('click', () => {
+      const texte = aCopier.map(m => m.textContent).join('\n');
+      const ok = () => { b.classList.add('fait'); b.innerHTML = coche + '<span class="txt">Copié</span>'; setTimeout(repos, 1800); };
+      try {
+        navigator.clipboard.writeText(texte).then(ok, () => selectionner(aCopier[0]));
+      } catch (e) { selectionner(aCopier[0]); }
+    });
+    console_.appendChild(b);
+  });
+</script>
+</body>
+</html>

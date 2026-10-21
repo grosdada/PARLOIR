@@ -12,6 +12,8 @@ Aucune dépendance : il faut seulement **Python 3.8+**.
 
 ## 1. Installation sur un PC
 
+> **Sous Windows**, le plus simple est de suivre le guide pas à pas : ouvre `installation/index.html` dans ton navigateur (double-clic sur le fichier). Toutes les commandes y sont, avec un bouton Copier.
+
 ```bash
 git clone https://github.com/grosdada/PARLOIR.git ~/parloir
 ```
