@@ -1,0 +1,10 @@
+# Réglages propres à chaque PC
+config.json
+
+# Mémoire locale (si aucun dossier synchronisé n'est configuré)
+memoire/
+parloir.jsonl
+
+__pycache__/
+*.pyc
+.DS_Store

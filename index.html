@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Parloir</title>
+<style>
+  :root {
+    --fond: #f4f1ea; --carte: #fffdf8; --texte: #24211c; --doux: #7a7367; --bord: #e2dccf;
+    --toi: #2f5bd3; --toi-bulle: #2f5bd3; --toi-texte: #fff;
+    --claude: #c2622f; --codex: #11806a; --autre: #6b5ca5;
+    --code: #efeadf;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #17161a; --carte: #222126; --texte: #ece8e1; --doux: #9a948a; --bord: #34323a;
+      --toi: #6d8fff; --toi-bulle: #3a5bd0; --toi-texte: #fff;
+      --claude: #e58a58; --codex: #3fc0a2; --autre: #a597e0;
+      --code: #2d2b32;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--fond); color: var(--texte);
+    font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+    border-bottom: 1px solid var(--bord); background: var(--carte);
+  }
+  h1 { font: 600 20px/1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: .02em; }
+  .presence { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--doux); margin-left: auto; }
+  .presence span { display: inline-flex; align-items: center; gap: 6px; }
+  .point { width: 8px; height: 8px; border-radius: 50%; background: var(--bord); }
+  .point.on { background: #2fb36b; box-shadow: 0 0 0 3px #2fb36b33; }
+  header button { background: none; border: 1px solid var(--bord); color: var(--doux); border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+  header button:hover { color: var(--texte); }
+  main { flex: 1; overflow-y: auto; padding: 20px 16px 8px; }
+  .fil { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .vide { text-align: center; color: var(--doux); margin-top: 18vh; }
+  .vide b { display: block; font: 600 22px Georgia, serif; color: var(--texte); margin-bottom: 8px; }
+  .vide code { background: var(--code); padding: 2px 6px; border-radius: 4px; }
+  .msg { display: flex; flex-direction: column; max-width: 88%; }
+  .msg .qui { font-size: 12px; font-weight: 600; margin: 0 4px 3px; display: flex; gap: 8px; align-items: baseline; }
+  .msg .qui time { font-weight: 400; color: var(--doux); }
+  .bulle { background: var(--carte); border: 1px solid var(--bord); border-radius: 14px; padding: 9px 14px; overflow-wrap: anywhere; }
+  .bulle > :first-child { margin-top: 0; } .bulle > :last-child { margin-bottom: 0; }
+  .bulle p { margin: .4em 0; } .bulle ul, .bulle ol { margin: .4em 0; padding-left: 1.4em; }
+  .bulle pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  .bulle code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; }
+  .bulle :not(pre) > code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  .bulle h3, .bulle h4 { margin: .6em 0 .3em; font-size: 1em; }
+  .bulle a { color: inherit; }
+  .msg.toi { align-self: flex-end; align-items: flex-end; }
+  .msg.toi .qui { color: var(--toi); }
+  .msg.toi .bulle { background: var(--toi-bulle); color: var(--toi-texte); border-color: transparent; border-bottom-right-radius: 4px; }
+  .msg.toi .bulle :not(pre) > code, .msg.toi .bulle pre { background: #ffffff22; }
+  .msg.ia .bulle { border-bottom-left-radius: 4px; border-left: 3px solid var(--c); }
+  .msg.ia .qui { color: var(--c); }
+  .systeme { align-self: center; font-size: 12px; color: var(--doux); padding: 2px 10px; }
+  footer { border-top: 1px solid var(--bord); background: var(--carte); padding: 10px 16px 14px; }
+  .saisie { max-width: 820px; margin: 0 auto; }
+  .mentions, #arobases { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mentions { margin-bottom: 8px; }
+  .mentions button { border: 1px solid var(--bord); background: none; color: var(--doux); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .mentions button:hover { color: var(--texte); }
+  form { display: flex; gap: 8px; align-items: flex-end; }
+  textarea {
+    flex: 1; resize: none; min-height: 44px; max-height: 40vh; padding: 11px 14px;
+    border: 1px solid var(--bord); border-radius: 12px; background: var(--fond); color: var(--texte);
+    font: inherit; outline: none;
+  }
+  textarea:focus { border-color: var(--toi); }
+  form button { height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--toi-bulle); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .aide { font-size: 12px; color: var(--doux); margin-top: 6px; }
+  .etat { font-size: 12px; color: #c0392b; margin-left: 8px; }
+  .pc { font-size: 12px; color: var(--doux); border: 1px solid var(--bord); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .actions { display: flex; gap: 8px; }
+  .msg.importe { opacity: .62; }
+  .msg.importe .bulle { border-style: dashed; }
+  /* --- Mémoire --- */
+  #voile { position: fixed; inset: 0; background: #0006; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 9; }
+  #voile.ouvert { opacity: 1; pointer-events: auto; }
+  #memoire {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 10;
+    background: var(--carte); border-left: 1px solid var(--bord); display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .2s ease;
+  }
+  #memoire.ouvert { transform: none; }
+  .m-tete { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--bord); }
+  .m-tete h2 { font: 600 17px Georgia, serif; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-tete button, .m-pied button { background: none; border: 1px solid var(--bord); color: var(--texte); border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+  .m-pied button.principal { background: var(--toi-bulle); color: #fff; border-color: transparent; font-weight: 600; }
+  .m-cherche { padding: 10px 16px; border-bottom: 1px solid var(--bord); }
+  .m-cherche input { width: 100%; padding: 8px 12px; border: 1px solid var(--bord); border-radius: 10px; background: var(--fond); color: var(--texte); font: inherit; outline: none; }
+  .m-cherche input:focus { border-color: var(--toi); }
+  .m-corps { flex: 1; overflow-y: auto; padding: 8px 8px 16px; }
+  .m-groupe { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--doux); margin: 14px 10px 4px; }
+  .m-conv { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--texte); font: inherit; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+  .m-conv:hover { background: var(--fond); }
+  .m-conv b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-conv small { color: var(--doux); font-size: 12px; }
+  .m-conv .extrait { display: block; font-size: 13px; color: var(--doux); margin-top: 2px; }
+  .m-conv mark { background: #f5c54266; color: inherit; border-radius: 3px; }
+  .m-lecture { padding: 8px; display: flex; flex-direction: column; gap: 10px; }
+  .m-lecture .msg { max-width: 100%; }
+  .m-pied { padding: 12px 16px; border-top: 1px solid var(--bord); display: flex; gap: 8px; justify-content: flex-end; }
+  .m-vide { color: var(--doux); text-align: center; padding: 40px 16px; font-size: 14px; }
+  @media (max-width: 560px) { header { flex-wrap: wrap; padding: 10px 16px; gap: 8px 12px; } .presence { margin-left: 0; width: 100%; order: 3; } .actions { margin-left: auto; } .msg { max-width: 96%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Le Parloir</h1>
+  <span class="pc" id="pc" title="Ce PC"></span>
+  <span class="etat" id="etat"></span>
+  <div class="presence" id="presence"></div>
+  <div class="actions">
+    <button id="ouvrirMemoire" title="Conversations passées, sur tous tes PC">Mémoire</button>
+    <button id="nouvelle" title="Archiver et repartir de zéro">Nouvelle conversation</button>
+  </div>
+</header>
+<div id="voile"></div>
+<aside id="memoire" aria-label="Mémoire">
+  <div class="m-tete"><button id="mRetour" hidden>←</button><h2 id="mTitre">Mémoire</h2><button id="mFermer">Fermer</button></div>
+  <div class="m-cherche" id="mCherche"><input id="mQ" type="search" placeholder="Chercher dans toutes les conversations…"></div>
+  <div class="m-corps" id="mCorps"></div>
+  <div class="m-pied" id="mPied" hidden><button class="principal" id="mReprendre">Reprendre ici</button></div>
+</aside>
+<main id="zone"><div class="fil" id="fil"></div></main>
+<footer>
+  <div class="saisie">
+    <div class="mentions">
+      <span id="arobases"></span>
+      <button data-m="/quitter">/quitter</button>
+    </div>
+    <form id="form">
+      <textarea id="texte" rows="1" placeholder="Écris au parloir…" autofocus></textarea>
+      <button type="submit">Envoyer</button>
+    </form>
+    <div class="aide">Entrée pour envoyer · Maj+Entrée pour aller à la ligne · @Nom pour s'adresser à un seul participant</div>
+  </div>
+</footer>
+<script>
+const fil = document.getElementById('fil'), zone = document.getElementById('zone');
+const champ = document.getElementById('texte'), etat = document.getElementById('etat');
+const COULEURS = { Claude: 'var(--claude)', Codex: 'var(--codex)', Grok: 'var(--autre)' };
+// Couleur stable pour tout autre invité (Grok, Gemini…), calculée à partir de son nom.
+function couleur(nom) {
+  if (COULEURS[nom]) return COULEURS[nom];
+  let h = 0; for (const c of nom) h = (h * 31 + c.charCodeAt(0)) % 300;
+  if (h >= 195) h += 60;   // on évite les bleus, réservés à « Toi »
+  return `hsl(${h} 55% ${matchMedia('(prefers-color-scheme: dark)').matches ? 68 : 42}%)`;
+}
+let connus = [];
+let dernier = 0;
+
+function echapper(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function enLigne(s) {
+  return s
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|\s)@([\wÀ-ÿ.-]+)/g, '$1<strong>@$2</strong>');
+}
+
+function markdown(src) {
+  const blocs = [];
+  src = echapper(src).replace(/```[^\n]*\n?([\s\S]*?)```/g, (_, c) => { blocs.push(c.replace(/\n$/, '')); return `\u0000${blocs.length - 1}\u0000`; });
+  const out = []; let liste = null;
+  const fermer = () => { if (liste) { out.push(`</${liste}>`); liste = null; } };
+  for (const l of src.split('\n')) {
+    let m;
+    if ((m = l.match(/^\u0000(\d+)\u0000$/))) { fermer(); out.push(`<pre><code>${blocs[m[1]]}</code></pre>`); }
+    else if ((m = l.match(/^\s*[-*•]\s+(.*)/))) { if (liste !== 'ul') { fermer(); out.push('<ul>'); liste = 'ul'; } out.push(`<li>${enLigne(m[1])}</li>`); }
+    else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (liste !== 'ol') { fermer(); out.push('<ol>'); liste = 'ol'; } out.push(`<li>${enLigne(m[1])}</li>`); }
+    else if ((m = l.match(/^#{1,6}\s+(.*)/))) { fermer(); out.push(`<h4>${enLigne(m[1])}</h4>`); }
+    else if (!l.trim()) { fermer(); }
+    else { fermer(); out.push(`<p>${enLigne(l)}</p>`); }
+  }
+  fermer();
+  return out.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => `<pre><code>${blocs[i]}</code></pre>`);
+}
+
+const DATE = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+function bulle(m, avecDate) {
+  const el = document.createElement('div');
+  if (m.systeme) { el.className = 'systeme'; el.textContent = m.texte; return el; }
+  const toi = m.auteur === 'Toi';
+  el.className = 'msg ' + (toi ? 'toi' : 'ia') + (m.importe ? ' importe' : '');
+  if (!toi) el.style.setProperty('--c', couleur(m.auteur));
+  const d = new Date((m.ts_origine || m.ts) * 1000);
+  const h = (avecDate || m.importe) ? d.toLocaleString('fr-FR', DATE) : d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  el.innerHTML = `<div class="qui">${echapper(m.auteur)} <time>${h}</time></div><div class="bulle">${markdown(m.texte)}</div>`;
+  return el;
+}
+function afficher(m) {
+  document.querySelector('.vide')?.remove();
+  fil.appendChild(bulle(m));
+}
+
+function videSiRien() {
+  if (!fil.children.length) fil.innerHTML = `<div class="vide"><b>Le parloir est ouvert.</b>
+    Dans Claude Code, Codex (ou tout autre invité), dis : <code>Connecte-toi au parloir</code><br>puis pose ta question ici.</div>`;
+}
+
+function presence(p) {
+  for (const n of ['Claude', 'Codex']) if (!(n in p)) p[n] = 'absent';
+  const noms = Object.keys(p);
+  document.getElementById('presence').innerHTML = Object.entries(p)
+    .map(([n, e]) => `<span style="color:${couleur(n)}"><i class="point ${e === 'present' ? 'on' : ''}"></i>${echapper(n)}</span>`).join('');
+  if (noms.join() !== connus.join()) {
+    connus = noms;
+    const zoneA = document.getElementById('arobases');
+    zoneA.innerHTML = noms.map(n => `<button data-m="@${echapper(n)} ">@${echapper(n)}</button>`).join('');
+    zoneA.querySelectorAll('button').forEach(brancher);
+  }
+}
+
+async function ecouter() {
+  for (;;) {
+    try {
+      const r = await fetch(`/api/messages?depuis=${dernier}&attendre=25`);
+      const d = await r.json();
+      etat.textContent = '';
+      let msgs = d.messages;
+      const i = msgs.map(m => !!m.nouvelle).lastIndexOf(true);
+      if (i >= 0) { fil.innerHTML = ''; msgs = msgs.slice(i); }   // nouvelle conversation ou reprise
+      const enBas = zone.scrollHeight - zone.scrollTop - zone.clientHeight < 80;
+      for (const m of msgs) afficher(m);
+      document.getElementById('pc').textContent = d.machine;
+      dernier = d.dernier;
+      presence(d.presence);
+      videSiRien();
+      if (enBas || d.messages.some(m => m.auteur === 'Toi')) zone.scrollTop = zone.scrollHeight;
+    } catch (e) {
+      etat.textContent = 'serveur injoignable…';
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+async function envoyer() {
+  const texte = champ.value.trim();
+  if (!texte) return;
+  champ.value = ''; ajuster();
+  await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auteur: 'Toi', texte }) });
+}
+
+function ajuster() { champ.style.height = 'auto'; champ.style.height = Math.min(champ.scrollHeight, innerHeight * .4) + 'px'; }
+
+document.getElementById('form').addEventListener('submit', e => { e.preventDefault(); envoyer(); });
+champ.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); envoyer(); } });
+champ.addEventListener('input', ajuster);
+function brancher(b) { b.addEventListener('click', () => { champ.value = b.dataset.m + champ.value; champ.focus(); ajuster(); }); }
+document.querySelectorAll('.mentions > button').forEach(brancher);
+presence({});
+document.getElementById('nouvelle').addEventListener('click', async () => {
+  if (confirm("Démarrer une nouvelle conversation ?\nL'actuelle reste dans la mémoire.")) await fetch('/api/nouvelle', { method: 'POST' });
+});
+
+// ---------- Mémoire ----------
+const panneau = document.getElementById('memoire'), voile = document.getElementById('voile');
+const mCorps = document.getElementById('mCorps'), mQ = document.getElementById('mQ');
+let choisie = null, minuterie = null;
+
+function ouvrirMemoire() { panneau.classList.add('ouvert'); voile.classList.add('ouvert'); liste(); mQ.focus(); }
+function fermerMemoire() { panneau.classList.remove('ouvert'); voile.classList.remove('ouvert'); }
+function modeListe() {
+  choisie = null;
+  document.getElementById('mTitre').textContent = 'Mémoire';
+  document.getElementById('mRetour').hidden = true;
+  document.getElementById('mPied').hidden = true;
+  document.getElementById('mCherche').hidden = false;
+}
+const jour = ts => new Date(ts * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const heure = ts => new Date(ts * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+function surligner(t, q) {
+  let h = echapper(t);
+  for (const w of q.split(/\s+/).filter(Boolean)) h = h.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), x => `<mark>${x}</mark>`);
+  return h;
+}
+
+async function liste() {
+  modeListe();
+  const q = mQ.value.trim();
+  if (q) {
+    const r = (await (await fetch('/api/memoire/chercher?q=' + encodeURIComponent(q))).json()).resultats;
+    mCorps.innerHTML = r.length ? r.map(x => `<button class="m-conv" data-machine="${echapper(x.machine)}" data-id="${echapper(x.id)}">
+      <b>${echapper(x.titre)}</b><small>${echapper(x.machine)} · ${jour(x.ts)} · ${echapper(x.auteur)}</small>
+      <span class="extrait">…${surligner(x.extrait, q)}…</span></button>`).join('') : '<div class="m-vide">Rien trouvé.</div>';
+  } else {
+    const d = await (await fetch('/api/memoire')).json();
+    const convs = d.conversations.filter(c => c.nb > 0);
+    if (!convs.length) { mCorps.innerHTML = `<div class="m-vide">La mémoire est vide pour l'instant.<br><br><small>Dossier : ${echapper(d.memoire)}</small></div>`; }
+    else {
+      let html = '', groupe = '';
+      for (const c of convs) {
+        const g = jour(c.fin);
+        if (g !== groupe) { html += `<div class="m-groupe">${g}</div>`; groupe = g; }
+        html += `<button class="m-conv" data-machine="${echapper(c.machine)}" data-id="${echapper(c.id)}">
+          <b>${echapper(c.titre)}</b>
+          <small>${c.machine === d.machine ? 'Ce PC' : echapper(c.machine)} · ${heure(c.fin)} · ${c.nb} messages · ${echapper(c.participants.join(', '))}${c.en_cours ? ' · <strong>en cours</strong>' : ''}</small></button>`;
+      }
+      mCorps.innerHTML = html;
+    }
+  }
+  mCorps.querySelectorAll('.m-conv').forEach(b => b.addEventListener('click', () => lire(b.dataset.machine, b.dataset.id)));
+}
+
+async function lire(machine, id) {
+  const c = await (await fetch(`/api/memoire/conversation?machine=${encodeURIComponent(machine)}&id=${encodeURIComponent(id)}`)).json();
+  choisie = { machine, id };
+  document.getElementById('mTitre').textContent = c.titre;
+  document.getElementById('mRetour').hidden = false;
+  document.getElementById('mCherche').hidden = true;
+  document.getElementById('mPied').hidden = false;
+  const zoneL = document.createElement('div'); zoneL.className = 'm-lecture';
+  const entete = document.createElement('div'); entete.className = 'systeme';
+  entete.textContent = `${machine} · ${jour(c.debut)}`;
+  zoneL.appendChild(entete);
+  for (const m of c.messages) zoneL.appendChild(bulle({ ...m, importe: false }, true));
+  mCorps.innerHTML = ''; mCorps.appendChild(zoneL); mCorps.scrollTop = 0;
+}
+
+document.getElementById('ouvrirMemoire').addEventListener('click', ouvrirMemoire);
+document.getElementById('mFermer').addEventListener('click', fermerMemoire);
+voile.addEventListener('click', fermerMemoire);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerMemoire(); });
+document.getElementById('mRetour').addEventListener('click', liste);
+mQ.addEventListener('input', () => { clearTimeout(minuterie); minuterie = setTimeout(liste, 250); });
+document.getElementById('mReprendre').addEventListener('click', async () => {
+  if (!choisie) return;
+  await fetch('/api/reprendre', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(choisie) });
+  fermerMemoire();
+});
+
+videSiRien();
+ecouter();
+</script>
+</body>
+</html>
