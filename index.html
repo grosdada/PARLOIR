@@ -34,6 +34,7 @@
   h1 { font: 600 20px/1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: .02em; }
   .presence { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--doux); margin-left: auto; }
   .presence span { display: inline-flex; align-items: center; gap: 6px; }
+  .presence .modele { color: var(--doux); opacity: .75; font-size: 12px; }
   .point { width: 8px; height: 8px; border-radius: 50%; background: var(--bord); }
   .point.on { background: #2fb36b; box-shadow: 0 0 0 3px #2fb36b33; }
   header .bouton-lien { border: 1px solid var(--bord); color: var(--doux); border-radius: 8px; padding: 5px 10px; font-size: 13px; text-decoration: none; }
@@ -52,6 +53,20 @@
   .bulle > :first-child { margin-top: 0; } .bulle > :last-child { margin-bottom: 0; }
   .bulle p { margin: .4em 0; } .bulle ul, .bulle ol { margin: .4em 0; padding-left: 1.4em; }
   .bulle pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  /* Boutons « Copier » : un par message (dans la ligne du nom), un par bloc de code. */
+  .copier {
+    background: var(--carte); border: 1px solid var(--bord); color: var(--doux); border-radius: 6px;
+    padding: 1px 7px; font: inherit; font-size: 11px; line-height: 1.5; cursor: pointer;
+    opacity: 0; transition: opacity .15s;
+  }
+  .copier:hover { color: var(--texte); }
+  .copier.fait { color: #2fb36b; border-color: #2fb36b88; }
+  .msg:hover .copier, .copier:focus-visible, .copier.fait { opacity: 1; }
+  .bloc-code { position: relative; }
+  .bloc-code pre { padding-right: 70px; }
+  .bloc-code > .copier { position: absolute; top: 7px; right: 7px; }
+  .msg.toi .bloc-code > .copier { background: var(--toi-bulle); border-color: #ffffff55; color: #fff; }
+  @media (hover: none) { .copier { opacity: 1; } }
   .bulle code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; }
   .bulle :not(pre) > code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
   .bulle h3, .bulle h4 { margin: .6em 0 .3em; font-size: 1em; }
@@ -111,27 +126,66 @@
   .m-lecture .msg { max-width: 100%; }
   .m-pied { padding: 12px 16px; border-top: 1px solid var(--bord); display: flex; gap: 8px; justify-content: flex-end; }
   .m-vide { color: var(--doux); text-align: center; padding: 40px 16px; font-size: 14px; }
+  /* --- Sujet de la conversation --- */
+  .sujet {
+    background: none; border: 1px solid var(--bord); color: var(--texte); border-radius: 999px;
+    padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; max-width: 32ch;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sujet:hover { border-color: var(--doux); }
+  .bouton-lien.maj { border-color: #2fb36b; color: #2fb36b; font-weight: 600; }
+  .modale { position: fixed; inset: 0; background: #0007; z-index: 20; display: grid; place-items: center; padding: 16px; }
+  .modale-boite {
+    background: var(--carte); border: 1px solid var(--bord); border-radius: 16px; padding: 20px;
+    width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px;
+  }
+  .modale-boite h2 { font: 600 19px Georgia, serif; margin: 0; }
+  .modale-boite label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--doux); }
+  .modale-boite input {
+    padding: 9px 12px; border: 1px solid var(--bord); border-radius: 10px;
+    background: var(--fond); color: var(--texte); font: inherit; outline: none;
+  }
+  .modale-boite input:focus { border-color: var(--toi); }
+  .modale-note { margin: 0; font-size: 13px; color: var(--doux); }
+  .modale-pied { display: flex; gap: 8px; justify-content: flex-end; }
+  .modale-pied button { background: none; border: 1px solid var(--bord); color: var(--texte); border-radius: 10px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  .modale-pied button.principal { background: var(--toi-bulle); color: #fff; border-color: transparent; font-weight: 600; }
   @media (max-width: 560px) { header { flex-wrap: wrap; padding: 10px 16px; gap: 8px 12px; } .presence { margin-left: 0; width: 100%; order: 3; } .actions { margin-left: auto; } .msg { max-width: 96%; } }
 </style>
 </head>
 <body>
 <header>
   <h1>Le Parloir</h1>
+  <button class="sujet" id="sujet" title="Renommer ce sujet ou le changer de dossier" hidden></button>
   <span class="pc" id="pc" title="Ce PC"></span>
   <span class="etat" id="etat"></span>
   <div class="presence" id="presence"></div>
   <div class="actions">
+    <a class="bouton-lien maj" id="majLien" href="/accueil" hidden></a>
     <a class="bouton-lien" href="/accueil" title="Installer, inviter des IA, réglages">Réglages</a>
     <button id="ouvrirMemoire" title="Conversations passées, sur tous tes PC">Mémoire</button>
-    <button id="nouvelle" title="Archiver et repartir de zéro">Nouvelle conversation</button>
+    <button id="nouvelle" title="Démarrer un sujet dédié">Nouveau sujet</button>
   </div>
 </header>
 <div id="voile"></div>
+<div class="modale" id="sujetModale" hidden>
+  <form class="modale-boite" id="sujetForm">
+    <h2 id="sujetTitre">Nouveau sujet</h2>
+    <label>Sujet<input id="sujetNom" type="text" maxlength="80" placeholder="Stratégie réseaux sociaux" required></label>
+    <label>Dossier<input id="sujetDossier" type="text" maxlength="60" list="dossiersConnus" placeholder="Sans dossier"></label>
+    <datalist id="dossiersConnus"></datalist>
+    <p class="modale-note" id="sujetNote"></p>
+    <div class="modale-pied">
+      <button type="button" id="sujetAnnuler">Annuler</button>
+      <button type="submit" class="principal" id="sujetOk">Démarrer</button>
+    </div>
+  </form>
+</div>
 <aside id="memoire" aria-label="Mémoire">
   <div class="m-tete"><button id="mRetour" hidden>←</button><h2 id="mTitre">Mémoire</h2><button id="mFermer">Fermer</button></div>
   <div class="m-cherche" id="mCherche"><input id="mQ" type="search" placeholder="Chercher dans toutes les conversations…"></div>
   <div class="m-corps" id="mCorps"></div>
-  <div class="m-pied" id="mPied" hidden><button class="principal" id="mReprendre">Reprendre ici</button></div>
+  <div class="m-pied" id="mPied" hidden><button id="mRenommer">Renommer / déplacer</button><button class="principal" id="mReprendre">Reprendre ici</button></div>
 </aside>
 <main id="zone"><div class="fil" id="fil"></div></main>
 <footer>
@@ -190,6 +244,28 @@ function markdown(src) {
   return out.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => `<pre><code>${blocs[i]}</code></pre>`);
 }
 
+function copier(texte, bouton, aSelectionner) {
+  const fait = () => {
+    bouton.classList.add('fait'); bouton.textContent = 'Copié ✓';
+    setTimeout(() => { bouton.classList.remove('fait'); bouton.textContent = 'Copier'; }, 1600);
+  };
+  const repli = () => {   // presse-papier refusé par le navigateur : on sélectionne, il reste Ctrl+C
+    const r = document.createRange(); r.selectNodeContents(aSelectionner);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    bouton.textContent = 'Ctrl+C';
+    setTimeout(() => { bouton.textContent = 'Copier'; }, 2400);
+  };
+  try { navigator.clipboard.writeText(texte).then(fait, repli); } catch (e) { repli(); }
+}
+
+function boutonCopier(texte, aSelectionner, quoi) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'copier'; b.textContent = 'Copier';
+  b.title = b.ariaLabel = `Copier ${quoi}`;
+  b.addEventListener('click', e => { e.stopPropagation(); copier(texte, b, aSelectionner); });
+  return b;
+}
+
 const DATE = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
 function bulle(m, avecDate) {
   const el = document.createElement('div');
@@ -200,6 +276,15 @@ function bulle(m, avecDate) {
   const d = new Date((m.ts_origine || m.ts) * 1000);
   const h = (avecDate || m.importe) ? d.toLocaleString('fr-FR', DATE) : d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   el.innerHTML = `<div class="qui">${echapper(m.auteur)} <time>${h}</time></div><div class="bulle">${markdown(m.texte)}</div>`;
+  // Copier le message entier (texte d'origine, avec son Markdown)…
+  el.querySelector('.qui').appendChild(boutonCopier(m.texte, el.querySelector('.bulle'), 'le message'));
+  // …et chaque bloc de code séparément : c'est ce qu'on veut coller la plupart du temps.
+  for (const pre of el.querySelectorAll('.bulle pre')) {
+    const bloc = document.createElement('div');
+    bloc.className = 'bloc-code';
+    pre.replaceWith(bloc); bloc.appendChild(pre);
+    bloc.appendChild(boutonCopier(pre.textContent, pre, 'le code'));
+  }
   return el;
 }
 function afficher(m) {
@@ -212,11 +297,14 @@ function videSiRien() {
     Dans Claude Code, Codex (ou tout autre invité), dis : <code>Connecte-toi au parloir</code><br>puis pose ta question ici.</div>`;
 }
 
-function presence(p) {
+function presence(p, modeles) {
+  modeles = modeles || {};
   for (const n of ['Claude', 'Codex']) if (!(n in p)) p[n] = 'absent';
   const noms = Object.keys(p);
+  // Le modèle est auto-déclaré par l'IA : s'il manque, on ne devine pas.
+  const modele = (n, e) => e === 'present' ? `<small class="modele" title="modèle déclaré par ${echapper(n)}">· ${echapper(modeles[n] || 'modèle inconnu')}</small>` : '';
   document.getElementById('presence').innerHTML = Object.entries(p)
-    .map(([n, e]) => `<span style="color:${couleur(n)}"><i class="point ${e === 'present' ? 'on' : ''}"></i>${echapper(n)}</span>`).join('');
+    .map(([n, e]) => `<span style="color:${couleur(n)}"><i class="point ${e === 'present' ? 'on' : ''}"></i>${echapper(n)}${modele(n, e)}</span>`).join('');
   if (noms.join() !== connus.join()) {
     connus = noms;
     const zoneA = document.getElementById('arobases');
@@ -238,7 +326,8 @@ async function ecouter() {
       for (const m of msgs) afficher(m);
       document.getElementById('pc').textContent = d.machine;
       dernier = d.dernier;
-      presence(d.presence);
+      presence(d.presence, d.modeles);
+      majSujet(d);
       videSiRien();
       if (enBas || d.messages.some(m => m.auteur === 'Toi')) zone.scrollTop = zone.scrollHeight;
     } catch (e) {
@@ -248,11 +337,19 @@ async function ecouter() {
   }
 }
 
+async function poster(chemin, corps) {
+  const r = await fetch(chemin, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' },
+    body: JSON.stringify(corps || {}),
+  });
+  return r.json();
+}
+
 async function envoyer() {
   const texte = champ.value.trim();
   if (!texte) return;
   champ.value = ''; ajuster();
-  await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' }, body: JSON.stringify({ auteur: 'Toi', texte }) });
+  await poster('/api/messages', { auteur: 'Toi', texte });
 }
 
 function ajuster() { champ.style.height = 'auto'; champ.style.height = Math.min(champ.scrollHeight, innerHeight * .4) + 'px'; }
@@ -263,9 +360,56 @@ champ.addEventListener('input', ajuster);
 function brancher(b) { b.addEventListener('click', () => { champ.value = b.dataset.m + champ.value; champ.focus(); ajuster(); }); }
 document.querySelectorAll('.mentions > button').forEach(brancher);
 presence({});
-document.getElementById('nouvelle').addEventListener('click', async () => {
-  if (confirm("Démarrer une nouvelle conversation ?\nL'actuelle reste dans la mémoire.")) await fetch('/api/nouvelle', { method: 'POST', headers: { 'X-Parloir': '1' } });
+
+// ---------- Sujet et dossier ----------
+const modale = document.getElementById('sujetModale');
+const sujetNom = document.getElementById('sujetNom'), sujetDossier = document.getElementById('sujetDossier');
+let sujetActuel = { titre: '', dossier: '' };
+let sujetMode = 'nouveau', sujetCible = null;   // sujetCible : conversation archivée qu'on renomme
+
+function majSujet(d) {
+  if (!d || !d.titre) return;
+  sujetActuel = { titre: d.titre, dossier: d.dossier || '' };
+  const b = document.getElementById('sujet');
+  b.textContent = d.titre + (d.dossier ? ' · ' + d.dossier : '');
+  b.hidden = false;
+}
+
+async function listerDossiers() {
+  try {
+    const d = await (await fetch('/api/dossiers')).json();
+    document.getElementById('dossiersConnus').innerHTML = (d.dossiers || []).map(x => `<option value="${echapper(x)}">`).join('');
+  } catch (e) {}
+}
+
+function ouvrirSujet(mode, depart) {
+  sujetMode = mode; sujetCible = (depart && depart.cible) || null;
+  const nouveau = mode === 'nouveau';
+  document.getElementById('sujetTitre').textContent = nouveau ? 'Nouveau sujet' : 'Renommer / déplacer';
+  document.getElementById('sujetOk').textContent = nouveau ? 'Démarrer' : 'Enregistrer';
+  document.getElementById('sujetNote').textContent = nouveau
+    ? "La conversation en cours reste dans la mémoire, on repart de zéro sur ce sujet."
+    : 'Laisse le dossier vide pour la sortir de son dossier.';
+  sujetNom.value = (depart && depart.titre) || '';
+  sujetDossier.value = (depart && depart.dossier) || '';
+  modale.hidden = false; listerDossiers(); sujetNom.focus(); sujetNom.select();
+}
+function fermerSujet() { modale.hidden = true; champ.focus(); }
+
+document.getElementById('sujetForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const titre = sujetNom.value.trim(), dossier = sujetDossier.value.trim();
+  fermerSujet();
+  if (sujetMode === 'nouveau') { majSujet(await poster('/api/nouvelle', { titre, dossier })); return; }
+  const d = await poster('/api/renommer', { ...(sujetCible || {}), titre, dossier });
+  majSujet(d);
+  if (sujetCible) { document.getElementById('mTitre').textContent = titre; liste(); }
 });
+document.getElementById('sujetAnnuler').addEventListener('click', fermerSujet);
+modale.addEventListener('click', e => { if (e.target === modale) fermerSujet(); });
+
+document.getElementById('sujet').addEventListener('click', () => ouvrirSujet('renommer', sujetActuel));
+document.getElementById('nouvelle').addEventListener('click', () => ouvrirSujet('nouveau'));
 
 // ---------- Mémoire ----------
 const panneau = document.getElementById('memoire'), voile = document.getElementById('voile');
@@ -282,6 +426,7 @@ function modeListe() {
   document.getElementById('mCherche').hidden = false;
 }
 const jour = ts => new Date(ts * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const dateCourte = ts => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 const heure = ts => new Date(ts * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 function surligner(t, q) {
   let h = echapper(t);
@@ -302,13 +447,19 @@ async function liste() {
     const convs = d.conversations.filter(c => c.nb > 0);
     if (!convs.length) { mCorps.innerHTML = `<div class="m-vide">La mémoire est vide pour l'instant.<br><br><small>Dossier : ${echapper(d.memoire)}</small></div>`; }
     else {
-      let html = '', groupe = '';
+      // Groupé par dossier, « Sans dossier » en dernier ; dans chaque dossier, la plus récente d'abord.
+      const parDossier = new Map();
       for (const c of convs) {
-        const g = jour(c.fin);
-        if (g !== groupe) { html += `<div class="m-groupe">${g}</div>`; groupe = g; }
-        html += `<button class="m-conv" data-machine="${echapper(c.machine)}" data-id="${echapper(c.id)}">
+        if (!parDossier.has(c.dossier || '')) parDossier.set(c.dossier || '', []);
+        parDossier.get(c.dossier || '').push(c);
+      }
+      const cles = [...parDossier.keys()].sort((a, b) => !a ? 1 : !b ? -1 : a.localeCompare(b, 'fr'));
+      let html = '';
+      for (const k of cles) {
+        html += `<div class="m-groupe">${k ? echapper(k) : 'Sans dossier'}</div>`;
+        for (const c of parDossier.get(k)) html += `<button class="m-conv" data-machine="${echapper(c.machine)}" data-id="${echapper(c.id)}">
           <b>${echapper(c.titre)}</b>
-          <small>${c.machine === d.machine ? 'Ce PC' : echapper(c.machine)} · ${heure(c.fin)} · ${c.nb} messages · ${echapper(c.participants.join(', '))}${c.en_cours ? ' · <strong>en cours</strong>' : ''}</small></button>`;
+          <small>${c.machine === d.machine ? 'Ce PC' : echapper(c.machine)} · ${dateCourte(c.fin)} ${heure(c.fin)} · ${c.nb} messages · ${echapper(c.participants.join(', '))}${c.en_cours ? ' · <strong>en cours</strong>' : ''}</small></button>`;
       }
       mCorps.innerHTML = html;
     }
@@ -318,7 +469,7 @@ async function liste() {
 
 async function lire(machine, id) {
   const c = await (await fetch(`/api/memoire/conversation?machine=${encodeURIComponent(machine)}&id=${encodeURIComponent(id)}`)).json();
-  choisie = { machine, id };
+  choisie = { machine, id, titre: c.titre, dossier: c.dossier || '' };
   document.getElementById('mTitre').textContent = c.titre;
   document.getElementById('mRetour').hidden = false;
   document.getElementById('mCherche').hidden = true;
@@ -334,14 +485,33 @@ async function lire(machine, id) {
 document.getElementById('ouvrirMemoire').addEventListener('click', ouvrirMemoire);
 document.getElementById('mFermer').addEventListener('click', fermerMemoire);
 voile.addEventListener('click', fermerMemoire);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerMemoire(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!modale.hidden) fermerSujet(); else fermerMemoire(); } });
 document.getElementById('mRetour').addEventListener('click', liste);
 mQ.addEventListener('input', () => { clearTimeout(minuterie); minuterie = setTimeout(liste, 250); });
 document.getElementById('mReprendre').addEventListener('click', async () => {
   if (!choisie) return;
-  await fetch('/api/reprendre', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Parloir': '1' }, body: JSON.stringify(choisie) });
+  majSujet(await poster('/api/reprendre', { machine: choisie.machine, id: choisie.id }));
   fermerMemoire();
 });
+document.getElementById('mRenommer').addEventListener('click', () => {
+  if (!choisie) return;
+  ouvrirSujet('renommer', { titre: choisie.titre, dossier: choisie.dossier, cible: { machine: choisie.machine, id: choisie.id } });
+});
+
+// ---------- Mise à jour ----------
+// Le serveur garde sa vérification en cache 10 min : on peut demander à chaque ouverture.
+async function verifierMaj() {
+  try {
+    const m = await (await fetch('/api/maj')).json();
+    const a = document.getElementById('majLien');
+    a.hidden = !m.disponible;
+    a.textContent = `Mise à jour ${m.derniere} →`;
+    a.title = m.fige ? 'Nouvelle version disponible : ouvre les réglages pour l’installer'
+                     : 'Nouvelle version disponible : fais « git pull » dans le dossier du parloir';
+  } catch (e) {}
+}
+verifierMaj();
+setInterval(verifierMaj, 30 * 60 * 1000);
 
 videSiRien();
 ecouter();

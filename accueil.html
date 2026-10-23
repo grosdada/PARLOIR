@@ -36,6 +36,7 @@
   .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
   .ia { border: 1px solid var(--bord); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--fond); min-width: 0; }
   .ia .nom { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+  .ia .nom .modele { font-weight: 400; font-size: 13px; color: var(--doux); }
   .pastille { width: 10px; height: 10px; border-radius: 50%; background: var(--bord); flex: none; }
   .pastille.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
   .ia .etat { font-size: 13px; color: var(--doux); }
@@ -111,12 +112,12 @@
     <p class="doux">Clique pour faire entrer une IA : sa fenêtre s'ouvre et elle rejoint la messagerie toute seule.</p>
     <div class="grille">
       <div class="ia" id="carteClaude">
-        <div class="nom"><i class="pastille" id="pClaude"></i>Claude</div>
+        <div class="nom"><i class="pastille" id="pClaude"></i>Claude<span class="modele" id="mClaude"></span></div>
         <div class="etat" id="eClaude"></div>
         <div class="actions"><button class="principal" data-lancer="claude">Faire entrer Claude</button></div>
       </div>
       <div class="ia" id="carteCodex">
-        <div class="nom"><i class="pastille" id="pCodex"></i>Codex</div>
+        <div class="nom"><i class="pastille" id="pCodex"></i>Codex<span class="modele" id="mCodex"></span></div>
         <div class="etat" id="eCodex"></div>
         <div class="actions"><button class="principal" data-lancer="codex">Faire entrer Codex</button></div>
       </div>
@@ -256,9 +257,13 @@ async function rafraichir() {
 
 async function presence() {
   try {
-    const p = (await (await fetch('/api/presence')).json()).presence;
-    $('pClaude').classList.toggle('on', p.Claude === 'present');
-    $('pCodex').classList.toggle('on', p.Codex === 'present');
+    const d = await (await fetch('/api/presence')).json();
+    const p = d.presence, modeles = d.modeles || {};
+    for (const n of ['Claude', 'Codex']) {
+      $('p' + n).classList.toggle('on', p[n] === 'present');
+      // Le modèle est auto-déclaré par l'IA : s'il manque, on ne devine pas.
+      $('m' + n).textContent = p[n] === 'present' ? '· ' + (modeles[n] || 'modèle inconnu') : '';
+    }
   } catch (e) {}
 }
 

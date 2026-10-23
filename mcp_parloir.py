@@ -28,7 +28,10 @@ BASE = os.environ.get("PARLOIR_URL", f"http://127.0.0.1:{PORT}")
 ap = argparse.ArgumentParser()
 ap.add_argument("--nom", default=os.environ.get("PARLOIR_NOM", "Invité"),
                 help="Nom affiché dans le parloir (Claude, Codex, Gemini…)")
-NOM = ap.parse_args().nom
+ap.add_argument("--modele", default=os.environ.get("PARLOIR_MODELE"),
+                help="Modèle affiché à côté du nom, si l'agent ne le déclare pas lui-même (ex. opus-5)")
+_a = ap.parse_args()
+NOM, MODELE_DEFAUT = _a.nom, _a.modele
 
 dernier_vu = 0
 
@@ -45,14 +48,20 @@ Règles de conversation :
 - Si l'humain écrit « /quitter » ou te demande de partir, appelle parloir_quitter et termine ton tour.
 Mémoire : toutes les conversations passées (de tous les PC de l'humain) sont consultables avec parloir_memoire.
 Utilise-la quand l'humain fait référence à une discussion antérieure (« comme on disait l'autre jour », « sur l'autre PC »…).
+Modèle : en entrant, passe à parloir_entrer le modèle sur lequel tu tournes vraiment (ex. « opus-5 », « gpt-6.1-sol · high »).
+Il s'affiche à côté de ton nom, pour que l'humain sache à qui il parle. Si ton modèle change en cours de route, rappelle parloir_entrer avec la nouvelle valeur.
 """
 
 OUTILS = [
     {
         "name": "parloir_entrer",
         "description": ("Entrer dans Le Parloir (à utiliser quand l'utilisateur dit « connecte-toi au parloir »). "
-                        "Renvoie les consignes et les derniers messages. Ensuite, boucle sur parloir_attendre."),
-        "inputSchema": {"type": "object", "properties": {}},
+                        "Renvoie les consignes et les derniers messages. Ensuite, boucle sur parloir_attendre. "
+                        "Rappelle-le avec un autre « modele » si ton modèle change en cours de conversation."),
+        "inputSchema": {"type": "object", "properties": {
+            "modele": {"type": "string", "description": ("Le modèle sur lequel tu tournes vraiment, affiché à côté "
+                                                         "de ton nom (ex. « opus-5 », « gpt-6.1-sol · high »). "
+                                                         "Laisse vide si tu ne le connais pas.")}}},
     },
     {
         "name": "parloir_attendre",
@@ -152,8 +161,10 @@ def formater(msgs):
     return "\n\n".join(lignes)
 
 
-def presence_txt(p):
-    return ", ".join(f"{n} ({e})" for n, e in p.items()) or "personne"
+def presence_txt(p, modeles=None):
+    modeles = modeles or {}
+    return ", ".join(f"{n}{' · ' + modeles[n] if modeles.get(n) else ''} ({e})"
+                     for n, e in p.items()) or "personne"
 
 
 def date(ts):
@@ -167,12 +178,16 @@ def outil(nom, args):
     assurer_serveur()
 
     if nom == "parloir_entrer":
-        r = http("POST", "/api/entrer", {"nom": NOM})
+        modele = str(args.get("modele") or MODELE_DEFAUT or "").strip()
+        # Sans modèle annoncé, on n'envoie pas le champ : une re-entrée n'effacera pas celui déjà connu.
+        r = http("POST", "/api/entrer", {"nom": NOM, **({"modele": modele} if modele else {})})
         h = http("GET", "/api/messages?depuis=0")
         msgs = h["messages"]
         dernier_vu = h["dernier"]
+        sujet = f"Sujet : « {h.get('titre')} »" + (f" · dossier « {h['dossier']} »" if h.get("dossier") else "")
         return (CONSIGNES + f"\nInterface pour l'humain : {BASE}\n"
-                f"PC : {h.get('machine')} · Présents : {presence_txt(r['presence'])}\n\n"
+                f"PC : {h.get('machine')} · Présents : {presence_txt(r['presence'], r.get('modeles'))}\n"
+                f"{sujet}\n\n"
                 f"--- Conversation en cours ---\n{formater(msgs[-30:]) or '(aucun message pour l’instant)'}\n\n"
                 "Maintenant, appelle parloir_attendre.")
 
@@ -192,7 +207,9 @@ def outil(nom, args):
                 entete += ("Voici l'échange repris de la mémoire (contexte, n'y réponds pas) :\n\n"
                            f"{formater(reprise)}\n\n=== Fin du contexte ===\n")
             else:
-                entete += "Oublie la conversation précédente : on repart de zéro.\n"
+                entete += ("On repart de zéro sur ce sujet : laisse la conversation précédente de côté, "
+                           "n'y reviens pas et ne la résume pas. Si tu as besoin de la relire, "
+                           "va la chercher dans parloir_memoire.\n")
         nouveaux = [m for m in msgs if m["auteur"] != NOM and not m.get("systeme") and not m.get("importe")]
         if not nouveaux:
             if entete:
@@ -236,7 +253,8 @@ def outil(nom, args):
         if not convs:
             return "La mémoire est vide."
         return "Conversations récentes (tous PC) :\n\n" + "\n".join(
-            f"- [{c['machine']} / {c['id']}] « {c['titre']} » — {date(c['fin'])}, {c['nb']} messages, "
+            f"- [{c['machine']} / {c['id']}] « {c['titre']} »"
+            f"{' · dossier ' + c['dossier'] if c.get('dossier') else ''} — {date(c['fin'])}, {c['nb']} messages, "
             f"{', '.join(c['participants'])}{' (en cours)' if c.get('en_cours') else ''}"
             for c in convs)
 

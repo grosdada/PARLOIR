@@ -40,7 +40,7 @@ verrou = threading.Condition()
 etat = {"conv": None, "fichier": None}   # conversation en cours sur ce PC
 messages = []          # messages de la conversation en cours
 compteur = [0]         # identifiants croissants, jamais remis à zéro
-presence = {}          # nom -> {"vu": ts, "etat": "present"|"parti"}
+presence = {}          # nom -> {"vu": ts, "etat": "present"|"parti", "modele": str|None}
 
 
 # ---------- mémoire ----------
@@ -63,6 +63,35 @@ def lire_jsonl(chemin):
     return out
 
 
+# ---------- sujet et dossier d'une conversation ----------
+# Rangés dans un petit fichier à côté du .jsonl : le format des conversations ne change pas,
+# et celles d'avant gardent leur titre déduit du premier message tant qu'on ne les nomme pas.
+
+def chemin_meta(chemin):
+    return chemin.with_suffix(".meta.json")
+
+
+def lire_meta(chemin):
+    try:
+        m = json.loads(chemin_meta(chemin).read_text(encoding="utf-8"))
+        return {"titre": str(m.get("titre") or "").strip(), "dossier": str(m.get("dossier") or "").strip()}
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+        return {"titre": "", "dossier": ""}
+
+
+def ecrire_meta(chemin, titre=None, dossier=None):
+    """Écrit le sujet et/ou le dossier. None = on ne touche pas, chaîne vide = on efface."""
+    m = lire_meta(chemin)
+    if titre is not None:
+        m["titre"] = " ".join(str(titre).split())[:80]
+    if dossier is not None:
+        m["dossier"] = " ".join(str(dossier).split())[:60]
+    cible = chemin_meta(chemin)
+    cible.parent.mkdir(parents=True, exist_ok=True)
+    cible.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")
+    return m
+
+
 def titre_de(msgs):
     reel = [m for m in msgs if not m.get("systeme")]
     if reel and reel[0].get("importe") and reel[0].get("titre"):
@@ -74,26 +103,43 @@ def titre_de(msgs):
     return "(sans titre)"
 
 
-_cache = {}   # chemin -> (mtime, taille, résumé)
+_cache = {}   # chemin -> (empreinte, résumé)
+
+
+def empreinte(chemin):
+    """Conversation + fiche de rangement : renommer sans toucher aux messages invalide le cache."""
+    st = chemin.stat()
+    try:
+        stm = chemin_meta(chemin).stat()
+    except OSError:
+        return (st.st_mtime, st.st_size, 0, 0)
+    return (st.st_mtime, st.st_size, stm.st_mtime, stm.st_size)
 
 
 def resume(chemin):
-    st = chemin.stat()
+    e = empreinte(chemin)
     cle = str(chemin)
-    if cle in _cache and _cache[cle][:2] == (st.st_mtime, st.st_size):
-        return _cache[cle][2]
+    if cle in _cache and _cache[cle][0] == e:
+        return _cache[cle][1]
     msgs = [m for m in lire_jsonl(chemin) if not m.get("systeme")]
+    meta = lire_meta(chemin)
     r = {
         "machine": chemin.parent.name,
         "id": chemin.stem,
-        "titre": titre_de(msgs),
-        "debut": msgs[0]["ts"] if msgs else st.st_mtime,
-        "fin": msgs[-1]["ts"] if msgs else st.st_mtime,
+        "titre": meta["titre"] or titre_de(msgs),
+        "dossier": meta["dossier"],
+        "nomme": bool(meta["titre"]),
+        "debut": msgs[0]["ts"] if msgs else e[0],
+        "fin": msgs[-1]["ts"] if msgs else e[0],
         "nb": len([m for m in msgs if not m.get("importe")]),
         "participants": sorted({m["auteur"] for m in msgs if not m.get("importe")}),
     }
-    _cache[cle] = (st.st_mtime, st.st_size, r)
+    _cache[cle] = (e, r)
     return r
+
+
+def dossiers():
+    return sorted({c["dossier"] for c in toutes_les_conversations() if c["dossier"]}, key=str.lower)
 
 
 def toutes_les_conversations():
@@ -178,26 +224,32 @@ def ajouter(auteur, texte, systeme=False, **extra):
         return msg
 
 
-def nouvelle_conversation(reprise=None):
+def nouvelle_conversation(reprise=None, titre=None, dossier=None):
     """Démarre une conversation vierge, ou la suite d'une conversation de la mémoire."""
     with verrou:
-        if not any(not m.get("systeme") for m in messages) and etat["fichier"].exists():
-            etat["fichier"].unlink()   # on ne garde pas une conversation vide
+        if not any(not m.get("systeme") for m in messages):
+            # On ne garde pas une conversation vide, ni sa fiche de rangement.
+            etat["fichier"].unlink(missing_ok=True)
+            chemin_meta(etat["fichier"]).unlink(missing_ok=True)
         messages.clear()
         cid = nouvel_id()
         if (MEMOIRE / MACHINE / f"{cid}.jsonl").exists():
             cid += f"-{compteur[0]}"
         ouvrir(cid)
+        if titre or dossier:
+            ecrire_meta(etat["fichier"], titre, dossier)
     if reprise:
-        machine, ancien, anciens = reprise
-        titre = titre_de(anciens)
-        ajouter("Parloir", f"Suite de « {titre} » ({machine}, {time.strftime('%d/%m/%Y', time.localtime(anciens[0]['ts']))}).",
+        machine, ancien, anciens, ancien_titre = reprise
+        ajouter("Parloir", f"Suite de « {ancien_titre} » ({machine}, {time.strftime('%d/%m/%Y', time.localtime(anciens[0]['ts']))}).",
                 systeme=True, nouvelle=True)
         for m in anciens:
             if not m.get("systeme"):
-                ajouter(m["auteur"], m["texte"], importe=True, origine=f"{machine}/{ancien}", ts_origine=m["ts"], titre=titre)
+                ajouter(m["auteur"], m["texte"], importe=True, origine=f"{machine}/{ancien}",
+                        ts_origine=m["ts"], titre=ancien_titre)
     else:
-        ajouter("Parloir", "Nouvelle conversation.", systeme=True, nouvelle=True)
+        # Le sujet part dans l'annonce : les IA savent de quoi on va parler avant le premier message.
+        ajouter("Parloir", f"Nouvelle conversation : {titre}" if titre else "Nouvelle conversation.",
+                systeme=True, nouvelle=True)
 
 
 def changer_memoire(nouvelle, machine=None):
@@ -212,9 +264,10 @@ def changer_memoire(nouvelle, machine=None):
         cible = MEMOIRE / MACHINE
         cible.mkdir(parents=True, exist_ok=True)
         if ancienne.is_dir() and ancienne.resolve() != cible.resolve():
-            for f in ancienne.glob("*.jsonl"):
-                if not (cible / f.name).exists():
-                    shutil.copy2(f, cible / f.name)
+            for motif in ("*.jsonl", "*.meta.json"):
+                for f in ancienne.glob(motif):
+                    if not (cible / f.name).exists():
+                        shutil.copy2(f, cible / f.name)
         ouvrir(etat["conv"])
 
 
@@ -235,8 +288,24 @@ def presents():
             for nom, p in presence.items()}
 
 
+def modeles():
+    """Modèle déclaré par chaque participant (auto-déclaré : le parloir ne peut pas le vérifier)."""
+    return {nom: p["modele"] for nom, p in presence.items() if p.get("modele")}
+
+
+def noter_modele(nom, valeur):
+    """Enregistre le modèle annoncé par un participant, et l'oublie si on lui passe du vide."""
+    if valeur is None:
+        return
+    p = presence.setdefault(nom, {"vu": time.time(), "etat": "present"})
+    p["modele"] = " ".join(str(valeur).split())[:60] or None
+
+
 def infos():
-    return {"machine": MACHINE, "conv": etat["conv"], "memoire": str(MEMOIRE), "titre": titre_de(messages)}
+    meta = lire_meta(etat["fichier"])
+    return {"machine": MACHINE, "conv": etat["conv"], "memoire": str(MEMOIRE),
+            "titre": meta["titre"] or titre_de(messages),
+            "dossier": meta["dossier"], "nomme": bool(meta["titre"])}
 
 
 # ---------- HTTP ----------
@@ -312,11 +381,19 @@ class Gestionnaire(BaseHTTPRequestHandler):
                         break
                     verrou.wait(reste)
                 res = nouveaux()
-            self._json(200, {"messages": res, "presence": presents(), "dernier": compteur[0], **infos()})
+            self._json(200, {"messages": res, "presence": presents(), "modeles": modeles(),
+                             "dernier": compteur[0], **infos()})
         elif url.path == "/api/presence":
-            self._json(200, {"presence": presents(), **infos()})
+            self._json(200, {"presence": presents(), "modeles": modeles(), **infos()})
         elif url.path == "/api/memoire":
-            self._json(200, {"conversations": toutes_les_conversations(), **infos()})
+            self._json(200, {"conversations": toutes_les_conversations(), "dossiers": dossiers(), **infos()})
+        elif url.path == "/api/dossiers":
+            self._json(200, {"dossiers": dossiers(), **infos()})
+        elif url.path == "/api/maj":
+            # Vérification en cache côté systeme (10 min) : la page de discussion peut demander souvent.
+            m = systeme.verifier_maj()
+            self._json(200, {"version": chemins.VERSION, "derniere": m.get("derniere"),
+                             "disponible": bool(m.get("disponible")), "fige": chemins.FIGE})
         elif url.path == "/api/memoire/conversation":
             c = chemin_conv(q.get("machine"), q.get("id"))
             if not c:
@@ -348,6 +425,7 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if auteur != HUMAIN:
                 presence.setdefault(auteur, {"etat": "present"})["vu"] = time.time()
                 presence[auteur]["etat"] = "present"
+                noter_modele(auteur, d.get("modele"))
                 if ia_daffilee() >= MAX_IA_DAFFILEE:
                     return self._json(429, {"erreur": (
                         f"{MAX_IA_DAFFILEE} messages d'IA d'affilée sans intervention humaine : "
@@ -358,10 +436,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if not nom:
                 return self._json(400, {"erreur": "nom manquant"})
             deja = presence.get(nom, {}).get("etat") == "present"
-            presence[nom] = {"vu": time.time(), "etat": "present"}
+            ancien = presence.get(nom, {}).get("modele")
+            presence[nom] = {"vu": time.time(), "etat": "present", "modele": ancien}
+            # Re-entrer en annonçant un autre modèle suffit à mettre l'affichage à jour.
+            noter_modele(nom, d.get("modele"))
             if not deja:
                 ajouter(nom, f"{nom} est entré dans le parloir.", systeme=True)
-            self._json(200, {"presence": presents(), **infos()})
+            self._json(200, {"presence": presents(), "modeles": modeles(), **infos()})
         elif url.path == "/api/quitter":
             nom = str(d.get("nom") or "").strip()[:40]
             if nom in presence:
@@ -369,8 +450,18 @@ class Gestionnaire(BaseHTTPRequestHandler):
                 ajouter(nom, f"{nom} a quitté le parloir.", systeme=True)
             self._json(200, {"presence": presents()})
         elif url.path in ("/api/nouvelle", "/api/effacer"):
-            nouvelle_conversation()
+            nouvelle_conversation(titre=d.get("titre"), dossier=d.get("dossier"))
             self._json(200, infos())
+        elif url.path == "/api/renommer":
+            # Sans machine/id : on renomme la conversation en cours.
+            c = etat["fichier"] if not d.get("id") else chemin_conv(d.get("machine"), d.get("id"))
+            if not c:
+                return self._json(404, {"erreur": "conversation introuvable"})
+            ecrire_meta(c, d.get("titre"), d.get("dossier"))
+            # « titre »/« dossier » décrivent toujours la conversation en cours (en-tête de la page) ;
+            # « conversation » décrit celle qu'on vient de renommer, en cours ou archivée.
+            self._json(200, {"conversation": resume(c) if c.exists() else None,
+                             "dossiers": dossiers(), **infos()})
         elif url.path == "/api/reprendre":
             c = chemin_conv(d.get("machine"), d.get("id"))
             if not c:
@@ -378,7 +469,12 @@ class Gestionnaire(BaseHTTPRequestHandler):
             anciens = [m for m in lire_jsonl(c) if not m.get("systeme")]
             if not anciens:
                 return self._json(400, {"erreur": "conversation vide"})
-            nouvelle_conversation(reprise=(d["machine"], d["id"], anciens))
+            r = resume(c)
+            ancien_titre = r["titre"]
+            # La suite reste rangée au même endroit, sous le même sujet, marqué « ↪ ».
+            nouvelle_conversation(reprise=(d["machine"], d["id"], anciens, ancien_titre),
+                                  titre=d.get("titre") or "↪ " + ancien_titre.lstrip("↪ "),
+                                  dossier=d["dossier"] if d.get("dossier") is not None else r["dossier"])
             self._json(200, infos())
         else:
             self._json(404, {"erreur": "introuvable"})

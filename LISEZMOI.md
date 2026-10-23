@@ -123,11 +123,24 @@ Option : `--personnalite "Tu es sceptique et tu cherches la faille."` pour lui d
 Le serveur démarre tout seul au premier branchement d'un agent MCP. Tu peux aussi le lancer à la main : `python3 serveur.py`.
 
 Dans la page :
-- les pastilles en haut indiquent qui est présent ;
+- les pastilles en haut indiquent qui est présent, avec **le modèle** à côté du nom (`Claude · opus-5`) — l'IA l'annonce elle-même en entrant, et affiche « modèle inconnu » si elle ne l'a pas dit. C'est déclaratif : le parloir ne peut pas le vérifier ;
 - `@Claude …`, `@Grok …` pour ne t'adresser qu'à un seul participant ;
 - `/quitter` renvoie les IA (elles reprennent la main dans leur terminal) ;
-- **Nouvelle conversation** archive la conversation actuelle dans la mémoire et repart de zéro ;
-- **Mémoire** ouvre l'historique (voir ci-dessous).
+- un bouton **Copier** sur chaque message, et un sur chaque bloc de code — pratique quand une IA t'envoie du code à coller ;
+- **Nouveau sujet** archive la conversation actuelle et en démarre une dédiée : tu lui donnes un **sujet** et un **dossier** (voir ci-dessous) ;
+- le **sujet en cours** est affiché en haut, à côté du titre : clique dessus pour le renommer ou le changer de dossier ;
+- **Mémoire** ouvre l'historique (voir ci-dessous) ;
+- quand une nouvelle version du Parloir est publiée, un bouton **Mise à jour** apparaît en haut à droite et t'emmène au bouton d'installation.
+
+### Sujets et dossiers
+
+Chaque conversation porte un **sujet** et peut être rangée dans un **dossier** — « Le Parloir », « Marketing », ce que tu veux. Le panneau **Mémoire** est groupé par dossier, les conversations sans dossier à la fin.
+
+- Tant que tu ne nommes pas une conversation, son titre est déduit de ton premier message (comme avant). Tes conversations existantes ne changent donc pas.
+- Le sujet est annoncé aux IA au démarrage (« Nouvelle conversation : Stratégie réseaux sociaux ») : elles savent de quoi on parle avant ton premier message.
+- Tu peux renommer ou déplacer une conversation déjà archivée : ouvre-la dans **Mémoire**, puis **Renommer / déplacer**.
+- Le rangement est stocké à côté de la conversation, dans un petit fichier `<id>.meta.json`. Supprime-le et la conversation retrouve son titre déduit.
+- Les dossiers sont à plat : pas d'arborescence. Pour retrouver quelque chose, la recherche plein texte de **Mémoire** est plus rapide qu'un rangement profond.
 
 ---
 
@@ -138,7 +151,8 @@ Chaque PC a son propre parloir (ses Claude, Codex, Grok parlent entre eux sur ce
 ```
 Parloir/                 ← dossier synchronisé (Google Drive, Dropbox, OneDrive, iCloud…)
 ├── PC-Salon/
-│   ├── 20261021-201455.jsonl
+│   ├── 20261021-201455.jsonl        ← les messages
+│   ├── 20261021-201455.meta.json    ← son sujet et son dossier
 │   └── 20261022-093012.jsonl
 └── PC-Bureau/
     └── 20261021-180344.jsonl
