@@ -207,7 +207,9 @@ def outil(nom, args):
                 entete += ("Voici l'échange repris de la mémoire (contexte, n'y réponds pas) :\n\n"
                            f"{formater(reprise)}\n\n=== Fin du contexte ===\n")
             else:
-                entete += "Oublie la conversation précédente : on repart de zéro.\n"
+                entete += ("On repart de zéro sur ce sujet : laisse la conversation précédente de côté, "
+                           "n'y reviens pas et ne la résume pas. Si tu as besoin de la relire, "
+                           "va la chercher dans parloir_memoire.\n")
         nouveaux = [m for m in msgs if m["auteur"] != NOM and not m.get("systeme") and not m.get("importe")]
         if not nouveaux:
             if entete:
