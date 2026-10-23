@@ -40,7 +40,7 @@ verrou = threading.Condition()
 etat = {"conv": None, "fichier": None}   # conversation en cours sur ce PC
 messages = []          # messages de la conversation en cours
 compteur = [0]         # identifiants croissants, jamais remis à zéro
-presence = {}          # nom -> {"vu": ts, "etat": "present"|"parti"}
+presence = {}          # nom -> {"vu": ts, "etat": "present"|"parti", "modele": str|None}
 
 
 # ---------- mémoire ----------
@@ -235,6 +235,19 @@ def presents():
             for nom, p in presence.items()}
 
 
+def modeles():
+    """Modèle déclaré par chaque participant (auto-déclaré : le parloir ne peut pas le vérifier)."""
+    return {nom: p["modele"] for nom, p in presence.items() if p.get("modele")}
+
+
+def noter_modele(nom, valeur):
+    """Enregistre le modèle annoncé par un participant, et l'oublie si on lui passe du vide."""
+    if valeur is None:
+        return
+    p = presence.setdefault(nom, {"vu": time.time(), "etat": "present"})
+    p["modele"] = " ".join(str(valeur).split())[:60] or None
+
+
 def infos():
     return {"machine": MACHINE, "conv": etat["conv"], "memoire": str(MEMOIRE), "titre": titre_de(messages)}
 
@@ -312,9 +325,10 @@ class Gestionnaire(BaseHTTPRequestHandler):
                         break
                     verrou.wait(reste)
                 res = nouveaux()
-            self._json(200, {"messages": res, "presence": presents(), "dernier": compteur[0], **infos()})
+            self._json(200, {"messages": res, "presence": presents(), "modeles": modeles(),
+                             "dernier": compteur[0], **infos()})
         elif url.path == "/api/presence":
-            self._json(200, {"presence": presents(), **infos()})
+            self._json(200, {"presence": presents(), "modeles": modeles(), **infos()})
         elif url.path == "/api/memoire":
             self._json(200, {"conversations": toutes_les_conversations(), **infos()})
         elif url.path == "/api/memoire/conversation":
@@ -348,6 +362,7 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if auteur != HUMAIN:
                 presence.setdefault(auteur, {"etat": "present"})["vu"] = time.time()
                 presence[auteur]["etat"] = "present"
+                noter_modele(auteur, d.get("modele"))
                 if ia_daffilee() >= MAX_IA_DAFFILEE:
                     return self._json(429, {"erreur": (
                         f"{MAX_IA_DAFFILEE} messages d'IA d'affilée sans intervention humaine : "
@@ -358,10 +373,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if not nom:
                 return self._json(400, {"erreur": "nom manquant"})
             deja = presence.get(nom, {}).get("etat") == "present"
-            presence[nom] = {"vu": time.time(), "etat": "present"}
+            ancien = presence.get(nom, {}).get("modele")
+            presence[nom] = {"vu": time.time(), "etat": "present", "modele": ancien}
+            # Re-entrer en annonçant un autre modèle suffit à mettre l'affichage à jour.
+            noter_modele(nom, d.get("modele"))
             if not deja:
                 ajouter(nom, f"{nom} est entré dans le parloir.", systeme=True)
-            self._json(200, {"presence": presents(), **infos()})
+            self._json(200, {"presence": presents(), "modeles": modeles(), **infos()})
         elif url.path == "/api/quitter":
             nom = str(d.get("nom") or "").strip()[:40]
             if nom in presence:
