@@ -184,8 +184,10 @@ def outil(nom, args):
         h = http("GET", "/api/messages?depuis=0")
         msgs = h["messages"]
         dernier_vu = h["dernier"]
+        sujet = f"Sujet : « {h.get('titre')} »" + (f" · dossier « {h['dossier']} »" if h.get("dossier") else "")
         return (CONSIGNES + f"\nInterface pour l'humain : {BASE}\n"
-                f"PC : {h.get('machine')} · Présents : {presence_txt(r['presence'], r.get('modeles'))}\n\n"
+                f"PC : {h.get('machine')} · Présents : {presence_txt(r['presence'], r.get('modeles'))}\n"
+                f"{sujet}\n\n"
                 f"--- Conversation en cours ---\n{formater(msgs[-30:]) or '(aucun message pour l’instant)'}\n\n"
                 "Maintenant, appelle parloir_attendre.")
 
@@ -249,7 +251,8 @@ def outil(nom, args):
         if not convs:
             return "La mémoire est vide."
         return "Conversations récentes (tous PC) :\n\n" + "\n".join(
-            f"- [{c['machine']} / {c['id']}] « {c['titre']} » — {date(c['fin'])}, {c['nb']} messages, "
+            f"- [{c['machine']} / {c['id']}] « {c['titre']} »"
+            f"{' · dossier ' + c['dossier'] if c.get('dossier') else ''} — {date(c['fin'])}, {c['nb']} messages, "
             f"{', '.join(c['participants'])}{' (en cours)' if c.get('en_cours') else ''}"
             for c in convs)
 
