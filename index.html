@@ -53,6 +53,20 @@
   .bulle > :first-child { margin-top: 0; } .bulle > :last-child { margin-bottom: 0; }
   .bulle p { margin: .4em 0; } .bulle ul, .bulle ol { margin: .4em 0; padding-left: 1.4em; }
   .bulle pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  /* Boutons « Copier » : un par message (dans la ligne du nom), un par bloc de code. */
+  .copier {
+    background: var(--carte); border: 1px solid var(--bord); color: var(--doux); border-radius: 6px;
+    padding: 1px 7px; font: inherit; font-size: 11px; line-height: 1.5; cursor: pointer;
+    opacity: 0; transition: opacity .15s;
+  }
+  .copier:hover { color: var(--texte); }
+  .copier.fait { color: #2fb36b; border-color: #2fb36b88; }
+  .msg:hover .copier, .copier:focus-visible, .copier.fait { opacity: 1; }
+  .bloc-code { position: relative; }
+  .bloc-code pre { padding-right: 70px; }
+  .bloc-code > .copier { position: absolute; top: 7px; right: 7px; }
+  .msg.toi .bloc-code > .copier { background: var(--toi-bulle); border-color: #ffffff55; color: #fff; }
+  @media (hover: none) { .copier { opacity: 1; } }
   .bulle code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .92em; }
   .bulle :not(pre) > code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
   .bulle h3, .bulle h4 { margin: .6em 0 .3em; font-size: 1em; }
@@ -191,6 +205,28 @@ function markdown(src) {
   return out.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => `<pre><code>${blocs[i]}</code></pre>`);
 }
 
+function copier(texte, bouton, aSelectionner) {
+  const fait = () => {
+    bouton.classList.add('fait'); bouton.textContent = 'Copié ✓';
+    setTimeout(() => { bouton.classList.remove('fait'); bouton.textContent = 'Copier'; }, 1600);
+  };
+  const repli = () => {   // presse-papier refusé par le navigateur : on sélectionne, il reste Ctrl+C
+    const r = document.createRange(); r.selectNodeContents(aSelectionner);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    bouton.textContent = 'Ctrl+C';
+    setTimeout(() => { bouton.textContent = 'Copier'; }, 2400);
+  };
+  try { navigator.clipboard.writeText(texte).then(fait, repli); } catch (e) { repli(); }
+}
+
+function boutonCopier(texte, aSelectionner, quoi) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'copier'; b.textContent = 'Copier';
+  b.title = b.ariaLabel = `Copier ${quoi}`;
+  b.addEventListener('click', e => { e.stopPropagation(); copier(texte, b, aSelectionner); });
+  return b;
+}
+
 const DATE = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
 function bulle(m, avecDate) {
   const el = document.createElement('div');
@@ -201,6 +237,15 @@ function bulle(m, avecDate) {
   const d = new Date((m.ts_origine || m.ts) * 1000);
   const h = (avecDate || m.importe) ? d.toLocaleString('fr-FR', DATE) : d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   el.innerHTML = `<div class="qui">${echapper(m.auteur)} <time>${h}</time></div><div class="bulle">${markdown(m.texte)}</div>`;
+  // Copier le message entier (texte d'origine, avec son Markdown)…
+  el.querySelector('.qui').appendChild(boutonCopier(m.texte, el.querySelector('.bulle'), 'le message'));
+  // …et chaque bloc de code séparément : c'est ce qu'on veut coller la plupart du temps.
+  for (const pre of el.querySelectorAll('.bulle pre')) {
+    const bloc = document.createElement('div');
+    bloc.className = 'bloc-code';
+    pre.replaceWith(bloc); bloc.appendChild(pre);
+    bloc.appendChild(boutonCopier(pre.textContent, pre, 'le code'));
+  }
   return el;
 }
 function afficher(m) {
