@@ -123,7 +123,7 @@ Option : `--personnalite "Tu es sceptique et tu cherches la faille."` pour lui d
 Le serveur démarre tout seul au premier branchement d'un agent MCP. Tu peux aussi le lancer à la main : `python3 serveur.py`.
 
 Dans la page :
-- les pastilles en haut indiquent qui est présent ;
+- les pastilles en haut indiquent qui est présent, avec **le modèle** à côté du nom (`Claude · opus-5`) — l'IA l'annonce elle-même en entrant, et affiche « modèle inconnu » si elle ne l'a pas dit. C'est déclaratif : le parloir ne peut pas le vérifier ;
 - `@Claude …`, `@Grok …` pour ne t'adresser qu'à un seul participant ;
 - `/quitter` renvoie les IA (elles reprennent la main dans leur terminal) ;
 - **Nouvelle conversation** archive la conversation actuelle dans la mémoire et repart de zéro ;

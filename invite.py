@@ -127,7 +127,7 @@ def main():
     except Exception:
         sys.exit(f"Le parloir n'est pas joignable sur {PARLOIR}. Lance d'abord : python3 serveur.py")
 
-    http("POST", f"{PARLOIR}/api/entrer", {"nom": NOM})
+    http("POST", f"{PARLOIR}/api/entrer", {"nom": NOM, "modele": MODELE})
     h = http("GET", f"{PARLOIR}/api/messages?depuis=0")
     historique, dernier = h["messages"], h["dernier"]
     print(f"{NOM} ({MODELE}) est dans le parloir : {PARLOIR}  — Ctrl+C pour sortir.", flush=True)

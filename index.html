@@ -34,6 +34,7 @@
   h1 { font: 600 20px/1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: .02em; }
   .presence { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--doux); margin-left: auto; }
   .presence span { display: inline-flex; align-items: center; gap: 6px; }
+  .presence .modele { color: var(--doux); opacity: .75; font-size: 12px; }
   .point { width: 8px; height: 8px; border-radius: 50%; background: var(--bord); }
   .point.on { background: #2fb36b; box-shadow: 0 0 0 3px #2fb36b33; }
   header .bouton-lien { border: 1px solid var(--bord); color: var(--doux); border-radius: 8px; padding: 5px 10px; font-size: 13px; text-decoration: none; }
@@ -212,11 +213,14 @@ function videSiRien() {
     Dans Claude Code, Codex (ou tout autre invité), dis : <code>Connecte-toi au parloir</code><br>puis pose ta question ici.</div>`;
 }
 
-function presence(p) {
+function presence(p, modeles) {
+  modeles = modeles || {};
   for (const n of ['Claude', 'Codex']) if (!(n in p)) p[n] = 'absent';
   const noms = Object.keys(p);
+  // Le modèle est auto-déclaré par l'IA : s'il manque, on ne devine pas.
+  const modele = (n, e) => e === 'present' ? `<small class="modele" title="modèle déclaré par ${echapper(n)}">· ${echapper(modeles[n] || 'modèle inconnu')}</small>` : '';
   document.getElementById('presence').innerHTML = Object.entries(p)
-    .map(([n, e]) => `<span style="color:${couleur(n)}"><i class="point ${e === 'present' ? 'on' : ''}"></i>${echapper(n)}</span>`).join('');
+    .map(([n, e]) => `<span style="color:${couleur(n)}"><i class="point ${e === 'present' ? 'on' : ''}"></i>${echapper(n)}${modele(n, e)}</span>`).join('');
   if (noms.join() !== connus.join()) {
     connus = noms;
     const zoneA = document.getElementById('arobases');
@@ -238,7 +242,7 @@ async function ecouter() {
       for (const m of msgs) afficher(m);
       document.getElementById('pc').textContent = d.machine;
       dernier = d.dernier;
-      presence(d.presence);
+      presence(d.presence, d.modeles);
       videSiRien();
       if (enBas || d.messages.some(m => m.auteur === 'Toi')) zone.scrollTop = zone.scrollHeight;
     } catch (e) {
